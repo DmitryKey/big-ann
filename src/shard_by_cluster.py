@@ -1,12 +1,10 @@
-from util.utils import read_fbin, read_bin, get_total_nvecs_fbin, pytorch_cos_sim
+from util.utils import read_fbin, read_bin, get_total_nvecs_fbin, pytorch_cos_sim, ts
 from numpy import linalg
 from statistics import median
 import numpy as np
 
 from torch import stack as torch_stack
 from sklearn.cluster import KMeans
-
-import datetime
 
 import os
 import nmslib
@@ -15,23 +13,19 @@ import nmslib
 RANDOM_SEED = 505
 
 #Size of the sample of points examined for during clustering
-SAMPLE_SIZE = 10000
+SAMPLE_SIZE = 200000
 
 #Number of centroids to find, and also the number of shards
-M = 100
+M = 1000
 
 #Maximum iterations of the kmeans clustering centroid fitter
 MAX_ITER = 25
 
 #Batch size for reading points from the input file during the sharding algorithm
-BATCH_SIZE = 10000
+BATCH_SIZE = 100000
 
 #Maximum data points to index (set to None to index everything in the dataset file)
-MAX_POINTS = 200000
-
-#Gets an ISO string timestamp, helps with seeing how long things took to run
-def ts():
-    return str(datetime.datetime.now());
+MAX_POINTS = 2000000
 
 #Renders the filename for a shard
 def shard_filename(path,name):
@@ -59,9 +53,9 @@ def find_centroids(data_file, dtype, sample_size: int = SAMPLE_SIZE, n_clusters:
     print(f'Clustering dataset shape: {points.shape}')
     print(f'Starting KMeans: {ts()}')
     if RANDOM_SEED:
-        kmeans = KMeans(n_clusters=n_clusters, random_state=RANDOM_SEED, max_iter=max_iter).fit(points)
+        kmeans = KMeans(n_clusters=n_clusters, random_state=RANDOM_SEED, max_iter=max_iter, verbose=1).fit(points)
     else:
-        kmeans = KMeans(n_clusters=n_clusters, max_iter=max_iter).fit(points)
+        kmeans = KMeans(n_clusters=n_clusters, max_iter=max_iter, verbose=1).fit(points)
     
     return kmeans.cluster_centers_
 
@@ -131,8 +125,11 @@ def index_dataset(
 
     print(f"Total number of points in dataset: {total_num_elements}")
     print(f"Maximum number of points to index: {range_upper}")
-
     print(f"Reading data from {data_file} in {BATCH_SIZE} chunks")
+
+    #median distances from centroids, to track drift from the sample
+    medians = []
+
     #Load and index the datafile in batches
     for batch in range(0, range_upper, BATCH_SIZE):
 
@@ -145,15 +142,21 @@ def index_dataset(
         #group the points by centroid
         group_ids = {}
         group_points = {}
+        distances = []
         for i in range(len(points)):
             point_id = batch+i
             point = points[i]
             key = results[i][0][0] #first id of the first tuple of the result
+            distances.append(results[i][1][0]) #first distance of the first tuple of the result
             if key not in group_ids:
                 group_ids[key] = []
                 group_points[key] = []
             group_ids[key].append(point_id)
             group_points[key].append(point)
+
+        med = median(distances)
+        medians.append(med)
+        print(f' Median: {med}')
 
         #add the points to the appropriate shards
         for key in group_ids.keys():
@@ -163,7 +166,7 @@ def index_dataset(
 
     print(f"Done! {ts()}")
 
-index_dataset("data/shards/","data/bigann/learn.100M.u8bin",np.uint8)
+index_dataset("../data/shards/","../data/bigann/learn.100M.u8bin",np.uint8)
 
 """
 These settings took 7 minutes on my macbook pro with other stuff running to fit KMeans:

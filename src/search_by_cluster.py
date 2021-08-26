@@ -85,7 +85,7 @@ def query_index(path,query_file,dtype,k=10):
     seconds = end_time - start_time
     print(f"Queries Per Second: {MAXIMUM_QUERIES/seconds}")
 
-query_index("data/shards/","data/bigann/query.public.10K.u8bin",np.uint8)
+query_index("../data/shards/","../data/bigann/query.public.10K.u8bin",np.uint8)
 
 """
 These settings took 7 minutes on my macbook pro with other stuff running to fit KMeans:

@@ -3,6 +3,14 @@ from sklearn.preprocessing import normalize
 import struct
 import torch
 from torch import Tensor
+import datetime
+
+
+def ts():
+    """
+    Gets an ISO string timestamp, helps with seeing how long things took to run
+    """
+    return str(datetime.datetime.now());
 
 
 def get_solr_vector_search(bert_client, query):
