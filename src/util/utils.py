@@ -157,6 +157,16 @@ def fbin_to_tsv(bin_fname: str, tsv_fname: str, total_elems: int):
     np.savetxt(tsv_fname, arr, delimiter="\t")
 
 
+# by Max Irwin
+def write_bin(filename, dtype, vecs):
+    assert len(vecs.shape) == 2, "Input array must have 2 dimensions"
+    with open(filename, "wb") as f:
+        nvecs, dim = vecs.shape
+        f.write(struct.pack('<i', nvecs))
+        f.write(struct.pack('<i', dim))
+        vecs.astype(dtype).flatten().tofile(f)
+
+#by UKPLab
 # From https://github.com/UKPLab/sentence-transformers/blob/master/sentence_transformers/util.py (MIT License)
 def pytorch_cos_sim(a: Tensor, b: Tensor):
     """

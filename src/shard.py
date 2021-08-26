@@ -1,4 +1,4 @@
-from util.utils import read_fbin, read_bin, get_total_nvecs_fbin, pytorch_cos_sim, ts
+from util.utils import read_fbin, read_bin, write_bin, get_total_nvecs_fbin, pytorch_cos_sim, ts
 from numpy import linalg
 from statistics import median
 import numpy as np
@@ -8,6 +8,7 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 
 import nmslib
 
+import os
 import sys
 import importlib
 import pickle
@@ -25,7 +26,11 @@ BATCH_SIZE = config.BATCH_SIZE
 MAX_POINTS = config.MAX_POINTS
 S = config.S
 
-#Renders the filename for a shard
+#Renders the filename for a shard bucket
+def bucket_filename(path,name):
+    return f'{path}bucket{name}.u8bin'
+
+#Renders the filename for a shard graph
 def shard_filename(path,name):
     return f'{path}shard{name}.hnsw'
 
@@ -44,15 +49,20 @@ def show_distance_stats(points):
     print(f'Farthest:{scores[0]}    Median:{median(scores)}     Closest:{scores[len(scores)-1]}')
 
 """
-Adds a batch of points to a specific shard
+Adds a batch of points to a specific shard bucket
 """
 def add_points(path,name,ids,points):
-    shardpath = shard_filename(path,name)
-    shard = nmslib.init(method='hnsw', space='l2')
-    shard.loadIndex(shardpath,load_data=True)
-    shard.addDataPointBatch(points,ids)
-    shard.createIndex(print_progress=False)
-    shard.saveIndex(shardpath,save_data=True)
+    bucketpath = bucket_filename(path,name)
+    if os.path.exists(bucketpath):
+        #load the bin file
+        bucket = read_bin(bucketpath,np.uint8)
+        #add the points
+        bucket = np.concatenate((bucket,points))
+    else:
+        bucket = points
+    #save the bin file
+    write_bin(bucketpath,np.uint8,bucket)
+
 
 """
 Creates a new shard graph for a centroid shard
@@ -82,7 +92,7 @@ def index_dataset(
     print(f'Loading KMeans: {ts()}')
     kmeans = pickle.load(open(centroids_filename(path), "rb"))
     centroids = kmeans.cluster_centers_
-    show_distance_stats(centroids)
+    #show_distance_stats(centroids)
 
     print(f'Creating Shards: {ts()}')
     for i in range(len(centroids)):
@@ -111,6 +121,7 @@ def index_dataset(
         #get the centroids for all the points in the batch
         results = kmeans.predict(points)
 
+        print(f"Indexing shard")
         #group the points by centroid
         group_ids = {}
         group_points = {}
@@ -134,7 +145,7 @@ def index_dataset(
 
         #add the points to the appropriate shards
         for key in group_ids.keys():
-            add_points(path,key,group_ids[key],group_points[key])
+            add_points(path,key,group_ids[key],np.vstack(group_points[key]))
 
         #assert len(list(group_ids.keys())) == len(points)
 
