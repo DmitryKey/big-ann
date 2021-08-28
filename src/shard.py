@@ -11,6 +11,7 @@ import sys
 import importlib
 import json
 import pickle
+import tqdm
 
 if len(sys.argv)>1:
     config_file = sys.argv[1]
@@ -117,12 +118,12 @@ def index_dataset(
         print(f"Organizing shard: {ts()}")
 
         distances = []
-        for i in range(len(points)):
+        for i in tqdm.tqdm(range(len(points))):
             point_id = batch+i
             point = points[i] #the point vector
             key = results[i] #index of the centroid
             centroid = centroids[key]
-            distance = np.linalg.norm(centroid-points) #l2 distance
+            distance = np.linalg.norm(centroid-point) #l2 distance
             distances.append(distance)
             if key not in groups:
                 groups[key] = []
