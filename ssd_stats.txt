@@ -1,0 +1,34 @@
+https://docs.microsoft.com/en-us/azure/virtual-machines/linux/attach-disk-portal
+
+meta-data=/dev/sdc1              isize=512    agcount=4, agsize=67108736 blks
+         =                       sectsz=4096  attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1
+data     =                       bsize=4096   blocks=268434944, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=131071, version=2
+         =                       sectsz=4096  sunit=1 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+
+
+
+
+
+/dev/sda1: UUID="cd9d14c3-2e33-447f-bbc1-11cff4e29be9" TYPE="ext4" PARTUUID="315dd780-01"
+/dev/sdb1: LABEL="cloudimg-rootfs" UUID="7339cdbb-1045-46fc-99df-ed81a4d0b313" TYPE="ext4" PARTUUID="15d1e14d-e787-4550-8457-dae123d40109"
+/dev/sdb15: LABEL_FATBOOT="UEFI" LABEL="UEFI" UUID="BD61-C33D" TYPE="vfat" PARTUUID="02bff6fe-fbb6-47bd-af18-645273993fdc"
+/dev/loop0: TYPE="squashfs"
+/dev/loop1: TYPE="squashfs"
+/dev/loop2: TYPE="squashfs"
+/dev/loop3: TYPE="squashfs"
+/dev/loop4: TYPE="squashfs"
+/dev/sdc1: UUID="4f35d638-f417-47c3-af0d-63311ccc1b9c" TYPE="xfs" PARTLABEL="xfspart" PARTUUID="25698431-c08b-4f4b-a9df-9c97328d37bf"
+/dev/sdb14: PARTUUID="40a58950-3814-4880-8671-f3386594554c"
+
+
+# CLOUD_IMG: This file was created/modified by the Cloud Image build process
+UUID=7339cdbb-1045-46fc-99df-ed81a4d0b313       /        ext4   defaults,discard        0 1
+UUID=BD61-C33D  /boot/efi       vfat    umask=0077      0 1
+/dev/disk/cloud/azure_resource-part1    /mnt    auto    defaults,nofail,x-systemd.requires=cloud-init.service,comment=cloudconfig       0       2
+UUID=4f35d638-f417-47c3-af0d-63311ccc1b9c       /datadrive      xfs     defaults,nofail 1       2

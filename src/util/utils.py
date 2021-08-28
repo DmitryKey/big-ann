@@ -162,11 +162,21 @@ def write_bin(filename, dtype, vecs):
     assert len(vecs.shape) == 2, "Input array must have 2 dimensions"
     with open(filename, "wb") as f:
         nvecs, dim = vecs.shape
+        print(vecs.shape)
         f.write(struct.pack('<i', nvecs))
         f.write(struct.pack('<i', dim))
         vecs.astype(dtype).flatten().tofile(f)
 
-#by UKPLab
+"""
+import mmap
+def mmap_bin(filename, dtype):
+    with open(filename, mode="wb") as file_obj:
+        with mmap.mmap(file_obj.fileno(), length=0, access=mmap.ACCESS_WRITE) as mmap_obj:
+            text = mmap_obj.read()
+            print(text)
+"""
+
+# by UKPLab
 # From https://github.com/UKPLab/sentence-transformers/blob/master/sentence_transformers/util.py (MIT License)
 def pytorch_cos_sim(a: Tensor, b: Tensor):
     """

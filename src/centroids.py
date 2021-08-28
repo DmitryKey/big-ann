@@ -16,6 +16,12 @@ else:
     config_file = 'config_small'
 config = importlib.import_module(config_file)
 
+#Where's the data
+INDEX_PATH = config.INDEX_PATH
+DATA_TYPE = config.DATA_TYPE
+DATA_FILE = config.DATA_FILE
+QUERY_FILE = config.QUERY_FILE
+
 #See config.small.py for the config options descriptions
 RANDOM_SEED = config.RANDOM_SEED
 SAMPLE_SIZE = config.SAMPLE_SIZE
@@ -30,7 +36,7 @@ def centroids_filename(path):
 #Show the extremes of the similarity scores between all the centroids
 def show_distance_stats(allpoints):
     #points = np.random.choice(allpoints,size=100)
-    points = allpoints[np.random.choice(allpoints.shape[0], size=500, replace=False)]
+    points = allpoints[np.random.choice(allpoints.shape[0], size=min(len(allpoints),500), replace=False)]
     similarities = pytorch_cos_sim(points,points)
     scores = []
     for a in range(len(similarities)-1):
@@ -98,4 +104,7 @@ def find_centroids_batch(
 
     return kmeans
 
-find_centroids_batch("../data/shards/","../data/bigann/learn.100M.u8bin",np.uint8)
+if __name__ == "__main__":
+    #find_centroids_batch("../data/shards/","../data/bigann/learn.100M.u8bin",np.uint8)
+    find_centroids_batch(INDEX_PATH,DATA_FILE,DATA_TYPE)
+    print(f"Done! {ts()}")

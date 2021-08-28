@@ -6,11 +6,10 @@ import numpy as np
 from torch import stack as torch_stack
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
-import nmslib
-
 import os
 import sys
 import importlib
+import json
 import pickle
 
 if len(sys.argv)>1:
@@ -18,6 +17,12 @@ if len(sys.argv)>1:
 else:
     config_file = 'config_small'
 config = importlib.import_module(config_file)
+
+#Where's the data
+INDEX_PATH = config.INDEX_PATH
+DATA_TYPE = config.DATA_TYPE
+DATA_FILE = config.DATA_FILE
+QUERY_FILE = config.QUERY_FILE
 
 #See config.small.py for the config options descriptions
 RANDOM_SEED = config.RANDOM_SEED
@@ -28,7 +33,7 @@ S = config.S
 
 #Renders the filename for a shard bucket
 def bucket_filename(path,name):
-    return f'{path}bucket{name}.u8bin'
+    return f'{path}bucket{name}.u8bin',f'{path}bucket{name}.json',
 
 #Renders the filename for a shard graph
 def shard_filename(path,name):
@@ -47,21 +52,6 @@ def show_distance_stats(points):
             scores.append(float(similarities[a][b]))
     scores = sorted(scores)
     print(f'Farthest:{scores[0]}    Median:{median(scores)}     Closest:{scores[len(scores)-1]}')
-
-"""
-Adds a batch of points to a specific shard bucket
-"""
-def add_points(path,name,ids,points):
-    bucketpath = bucket_filename(path,name)
-    if os.path.exists(bucketpath):
-        #load the bin file
-        bucket = read_bin(bucketpath,np.uint8)
-        #add the points
-        bucket = np.concatenate((bucket,points))
-    else:
-        bucket = points
-    #save the bin file
-    write_bin(bucketpath,np.uint8,bucket)
 
 
 """
@@ -89,14 +79,14 @@ def index_dataset(
         max_points: int = MAX_POINTS
     ):
     
-    print(f'Loading KMeans: {ts()}')
+    print(f'Loading KMeans from {centroids_filename(path)}: {ts()}')
     kmeans = pickle.load(open(centroids_filename(path), "rb"))
     centroids = kmeans.cluster_centers_
     #show_distance_stats(centroids)
 
-    print(f'Creating Shards: {ts()}')
-    for i in range(len(centroids)):
-        add_shard(path,i)
+    #print(f'Creating Buckets in {path}: {ts()}')
+    #for i in range(len(centroids)):
+    #    add_shard(path,i)
 
     #Prepare for batch indexing
     total_num_elements = get_total_nvecs_fbin(data_file)
@@ -112,19 +102,20 @@ def index_dataset(
     #median distances from centroids, to track drift from the sample
     medians = []
 
-    #Load and index the datafile in batches
+    #group the points by centroid
+    groups = {}
+
+    #Organize ids and distances by centroid:
     for batch in range(0, range_upper, batch_size):
 
-        print(f"Processing index {batch}: {ts()}")
+        print(f"Predicting points {batch} to {batch+batch_size}: {ts()}")
         points = read_bin(data_file, dtype, start_idx=batch, chunk_size=batch_size)
 
         #get the centroids for all the points in the batch
         results = kmeans.predict(points)
 
-        print(f"Indexing shard")
-        #group the points by centroid
-        group_ids = {}
-        group_points = {}
+        print(f"Organizing shard: {ts()}")
+
         distances = []
         for i in range(len(points)):
             point_id = batch+i
@@ -133,38 +124,65 @@ def index_dataset(
             centroid = centroids[key]
             distance = np.linalg.norm(centroid-points) #l2 distance
             distances.append(distance)
-            if key not in group_ids:
-                group_ids[key] = []
-                group_points[key] = []
-            group_ids[key].append(point_id)
-            group_points[key].append(point)
-
+            if key not in groups:
+                groups[key] = []
+            groups[key].append({"id":point_id,"distance":distance})
+                
         med = median(distances)
         medians.append(med)
         print(f' Median: {med}')
 
-        #add the points to the appropriate shards
-        for key in group_ids.keys():
-            add_points(path,key,group_ids[key],np.vstack(group_points[key]))
+    
+    #Split into buckets on disk
+    for key in sorted(groups.keys()):
+        group = groups[key]
+        print(f"Saving bucket {key}: {ts()}")
+        bucket = np.empty((0,128))
+        for batch in range(0, range_upper, batch_size):
+            points = read_bin(data_file, dtype, start_idx=batch, chunk_size=batch_size)
+            head = batch
+            tail = batch + batch_size
+            for row in group:
+                if head<=row['id'] or row['id']>tail:
+                    bucket = np.vstack([bucket,point])
 
-        #assert len(list(group_ids.keys())) == len(points)
+        bucketpath,jsonpath = bucket_filename(path,key)
+        write_bin(bucketpath,DATA_TYPE,bucket)
+        with open(jsonpath, "w") as f:
+            f.write(json.dumps(group))
 
     print(f"Done! {ts()}")
 
-index_dataset("../data/shards/","../data/bigann/learn.100M.u8bin",np.uint8)
+"""
+Creates the index and shard graphs for an entire dataset
+"""
+def speed_read_test(
+        path,
+        data_file, 
+        dtype, 
+        batch_size: int = BATCH_SIZE, 
+        sample_size: int = SAMPLE_SIZE, 
+        n_clusters: int = S, 
+        max_points: int = MAX_POINTS
+    ):
 
-"""
-These settings took 7 minutes on my macbook pro with other stuff running to fit KMeans:
-RANDOM_SEED = 505
-SAMPLE_SIZE = 100000
-M = 1000
-MAX_ITER = 50
-BATCH_SIZE = 1000000
-"""
+    #Prepare for batch indexing
+    total_num_elements = get_total_nvecs_fbin(data_file)
+    if max_points and max_points<total_num_elements:
+        range_upper = max_points
+    else:
+        range_upper = total_num_elements
 
-"""
-The idea is to go *very* wide with the clustering, to increase the number of shards
-For 10k centroids there are 10k shards (each with 100k vectors)
-For 100k centroids there are 100k shards (each with 10k vectors)
-For 1m centroids there are 1m shards (each with 1k vectors)
-"""
+    print(f"Total number of points in dataset: {total_num_elements}")
+    print(f"Maximum number of points to index: {range_upper}")
+    print(f"Reading data from {data_file} in {BATCH_SIZE} chunks")
+
+    #Load and index the datafile in batches
+    for batch in range(0, range_upper, batch_size):
+        print(f"Reading points {batch} to {batch+batch_size}: {ts()}")
+        points = read_bin(data_file, dtype, start_idx=batch, chunk_size=batch_size)
+
+
+if __name__ == "__main__":
+    index_dataset(INDEX_PATH,DATA_FILE,DATA_TYPE)
+    #speed_read_test(INDEX_PATH,DATA_FILE,DATA_TYPE)
