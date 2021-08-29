@@ -82,6 +82,7 @@ def index_dataset(
     
     print(f'Loading KMeans from {centroids_filename(path)}: {ts()}')
     kmeans = pickle.load(open(centroids_filename(path), "rb"))
+    kmeans.verbose=0
     centroids = kmeans.cluster_centers_
     #show_distance_stats(centroids)
 
@@ -127,13 +128,25 @@ def index_dataset(
             distances.append(distance)
             if key not in groups:
                 groups[key] = []
-            groups[key].append({"id":point_id,"distance":distance})
+            groups[key].append([point_id,distance])
                 
         med = median(distances)
         medians.append(med)
         print(f' Median: {med}')
 
+
+    #Split into buckets on disk
+    counts = open(f'{path}bucket_distribution_{config_file}.csv','a+')
+    counts.write('key,points\n')
+    for key in sorted(groups.keys()):
+        group = {"key":str(key),"group":groups[key]}
+        _,jsonpath = bucket_filename(path,key)
+        with open(jsonpath, "w") as f:
+            f.write(json.dumps(group))
+        counts.write(f'{key},{len(groups[key])}\n')
+    counts.close()
     
+    """
     #Split into buckets on disk
     for key in sorted(groups.keys()):
         group = groups[key]
@@ -144,13 +157,14 @@ def index_dataset(
             head = batch
             tail = batch + batch_size
             for row in group:
-                if head<=row['id'] or row['id']>tail:
+                if head<=row[0] or row[0]>tail:
                     bucket = np.vstack([bucket,point])
 
         bucketpath,jsonpath = bucket_filename(path,key)
         write_bin(bucketpath,DATA_TYPE,bucket)
         with open(jsonpath, "w") as f:
             f.write(json.dumps(group))
+    """
 
     print(f"Done! {ts()}")
 
