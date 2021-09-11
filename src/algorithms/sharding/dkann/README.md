@@ -7,7 +7,7 @@ the others. This forms a clustered space, where the number of clusters or their 
 and is highly dependent on the dataset nature: text based embeddings can be distributed differently than, say, image 
 descriptors.
 
-![alt text](kanddi.jpeg)
+![alt text](kanndi.jpeg)
 
 The core of this algorithm is the following:
 1. Compute an average distance `d` between any pair of points in a sample of the dataset.
