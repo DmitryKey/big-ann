@@ -1,7 +1,7 @@
-DKANN Sharding Algorithm
+KANNDI Sharding Algorithm
 =====
 
-The DKANN Algorithm uses the intuition of multidimensional collocations. If points in the input dataset are related with
+The KANNDI (K Approximate Nearest Neighbours Distance-based) Algorithm (read: /ˈkændi/) uses the intuition of multidimensional collocations. If points in the input dataset are related with
 respect to a certain distance (Euclidean, cosine, semantic), intuitively some points will be closer to each other, than
 the others. This forms a clustered space, where the number of clusters or their density is unknown for any new dataset,
 and is highly dependent on the dataset nature: text based embeddings can be distributed differently than, say, image 
@@ -35,4 +35,10 @@ SEARCHING
 3. Use HNSW to find the top `k` in each shard (or that single shard -- debatable).
 4. Form a list from all the shards that participated in the search and re-sort the list with respect to the true distance from `p*`.
 5. Return top 10.
+
+Experiments
+===
+
+The distance `d` can be approximated with let’s say median of all pair-wise distances in a sample. 
+For instance for Yandex dataset for the first 1000 points we get d=1.305342435836792
 

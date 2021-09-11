@@ -3,7 +3,10 @@ from numpy import linalg
 from statistics import median
 import numpy as np
 
-# desired number of shards
+# desired number of shardsCreates a new shard graph for a centroid shard
+# The shard is an HNSW graph with neighborhoods of the parent centroid.
+# The shard is persisted to disk for each addition.
+# The shard is loaded from disk and searched when a query is in its centroid neighborhood.
 M = 1000
 
 # target maximum distance between points to fall inside a shard
