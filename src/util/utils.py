@@ -4,6 +4,7 @@ import struct
 import torch
 from torch import Tensor
 import datetime
+import math
 
 
 def ts():
@@ -70,6 +71,11 @@ def get_total_nvecs_fbin(filename):
 
     return nvecs
 
+def get_total_dim_fbin(filename):
+    with open(filename, "rb") as f:
+        nvecs, dim = np.fromfile(f, count=2, dtype=np.int32)
+
+    return dim
 
 def read_fbin(filename, start_idx=0, chunk_size=None):
     """ Read *.fbin file that contains float32 vectors
@@ -198,3 +204,11 @@ def pytorch_cos_sim(a: Tensor, b: Tensor):
     a_norm = torch.nn.functional.normalize(a, p=2, dim=1)
     b_norm = torch.nn.functional.normalize(b, p=2, dim=1)
     return torch.mm(a_norm, b_norm.transpose(0, 1))
+
+
+#https://stackoverflow.com/questions/15450192/fastest-way-to-compute-entropy-in-python#45091961
+def entropy(labels, base=None):
+  value,counts = np.unique(labels, return_counts=True)
+  norm_counts = counts / counts.sum()
+  base = math.e if base is None else base
+  return -(norm_counts * np.log(norm_counts)/np.log(base)).sum()

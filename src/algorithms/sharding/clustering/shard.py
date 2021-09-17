@@ -34,7 +34,7 @@ S = config.S
 
 #Renders the filename for a shard bucket
 def bucket_filename(path,name):
-    return f'{path}bucket{name}.u8bin',f'{path}bucket{name}.json',
+    return f'{path}bucket{name}.u8bin',f'{path}bucket{name}.json'
 
 #Renders the filename for a shard graph
 def shard_filename(path,name):

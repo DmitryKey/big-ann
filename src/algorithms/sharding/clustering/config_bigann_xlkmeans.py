@@ -14,7 +14,7 @@ RANDOM_SEED=505
 SAMPLE_SIZE=10000000
 
 #Number of samples per batch
-BATCH_SIZE=100000
+BATCH_SIZE=250000
 
 #Number of centroids to find
 S=10000
