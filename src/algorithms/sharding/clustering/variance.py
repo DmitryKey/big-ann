@@ -8,7 +8,7 @@ import math
 from util.utils import read_fbin, read_bin, get_total_nvecs_fbin, get_total_dim_fbin, pytorch_cos_sim, ts, entropy
 from numpy import linalg
 from statistics import median
-from scipy.stats import anderson
+from scipy.stats import anderson,kstest
 
 from torch import stack as torch_stack
 
@@ -34,6 +34,19 @@ SAMPLE_SIZE = config.SAMPLE_SIZE
 BATCH_SIZE = config.BATCH_SIZE
 MAX_ITER = config.MAX_ITER
 S = config.S
+
+"""
+from scipy import interpolate
+import numpy as np
+def bimodal_split_point(hist)
+    t=np.linspace(0,1,200)
+    x=np.cos(5*t)
+    y=np.sin(7*t)
+    tck, u = interpolate.splprep([x,y])
+
+    ti = np.linspace(0, 1, 200)
+    dxdt, dydt = interpolate.splev(ti,tck,der=1)
+"""
 
 """
 This will get the variance and entropy for dimensions of a dataset
@@ -67,14 +80,20 @@ def calculate_variance(
     entropies = []
     covariance_num = total_num_dimensions-1
 
+    #just a safety precaution.  These tests can get big!  Remove at your own risk
     assert(sample_size<=100000)
     
+    #Read all the points of the sample_size into memory
     points = read_bin(data_file, dtype, start_idx=0, chunk_size=sample_size)
+    
+    #variance of entire sample
     sample_variance = np.var(points)
 
     #Make a dataframe
     schema = {"dimension":[],"variance":[],"entropy":[]}
     for codim in range(covariance_num):
+        schema[f'ksdimension_{codim}'] = []
+        schema[f'ksstatistic_{codim}'] = []
         schema[f'codimension_{codim}'] = []
         schema[f'covariance_{codim}'] = []
     df = pd.DataFrame(schema)
@@ -90,10 +109,11 @@ def calculate_variance(
         a = anderson(dim_points,dist='norm')
         print(a)
 
-        #Find the lowest covariance dim:
+        #Find the covariance pairs:
         covars = []
-        min_covar_val = sample_variance
-        min_covar_dim = 999
+
+        #Find the kolmogorov-smirnov pairs:
+        kstests = []
 
         #Compare with every other dimension's variance:
         for dim2 in range(total_num_dimensions):
@@ -104,17 +124,33 @@ def calculate_variance(
             covar = np.var(covar_points)
             covars.append((covar,dim2))
         
+            ksresult = kstest(dim_points,dim2_points)
+            kstests.append((ksresult.statistic,dim2))
+
+
         #which dimensions covariance is best?
         covars = sorted(covars, key = lambda x: x[0])
 
+        #which dimensions kstests is best?
+        kstests = sorted(kstests, key = lambda x: x[0])
+
         row = {"dimension":dim,"variance":v,"entropy":e}
         for codim in range(covariance_num):
+            row[f'ksdimension_{codim}'] = kstests[codim][1]
+            row[f'ksstatistic_{codim}'] = kstests[codim][0]
             row[f'codimension_{codim}'] = covars[codim][1]
             row[f'covariance_{codim}'] = covars[codim][0]
         df = df.append(row,ignore_index=True)
 
         variance.append(v)
         entropies.append(e)
+
+        #   Writing this for later before I forget
+        #   I want to look for local minima/maxima of the density functions per dimension
+        #   This can then be used for subdividing the bimodal distributions for 'if left peak do A if right peak do B...'
+        #histo = np.histogram(dim_points, bins=256)
+        #probs = np.histogram(dim_points, bins=256, density=True)
+        #split = bimodal_split_point(histo)
 
     print(df)
 
