@@ -8,6 +8,7 @@ import math
 from util.utils import read_fbin, read_bin, get_total_nvecs_fbin, get_total_dim_fbin, pytorch_cos_sim, ts, entropy
 from numpy import linalg
 from statistics import median
+from scipy.stats import anderson
 
 from torch import stack as torch_stack
 
@@ -86,6 +87,8 @@ def calculate_variance(
 
         v = np.var(dim_points)
         e = entropy(dim_points)
+        a = anderson(dim_points,dist='norm')
+        print(a)
 
         #Find the lowest covariance dim:
         covars = []
