@@ -2,7 +2,7 @@
 
 Let's use this repo for experimenting with Big ANN algorithm ideas.
 
-Billion-Scale Approximate Nearest Neighbor Search Challenge: http://big-ann-benchmarks.com/index.html#call
+Billion-Scale Approximate Nearest Neighbor Search Challenge: http://big-ann-benchmarks.com/index.html
 
 Solutions implemented so far:
 
