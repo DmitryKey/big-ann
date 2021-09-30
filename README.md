@@ -8,4 +8,4 @@ Solutions implemented so far:
 
 1. [**Sharding**](src/algorithms/sharding)
    1. [**Clustering**](src/algorithms/sharding/clustering) K-Means based sharding algorithm
-   2. [**KANNDI**](src/algorithms/sharding/kanndi)K Approximate Nearest Neighbours DIstance-based algorithm
+   2. [**KANNDI**](src/algorithms/sharding/kanndi) K Approximate Nearest Neighbours DIstance-based algorithm
