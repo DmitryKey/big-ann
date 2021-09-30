@@ -1,9 +1,10 @@
 KANNDI Sharding Algorithm
 =====
 
-The KANNDI (K Approximate Nearest Neighbours Distance-based) Algorithm (read: /ˈkændi/) uses the intuition of multidimensional collocations. If points in the input dataset are related with
-respect to a certain distance (Euclidean, cosine, semantic), intuitively some points will be closer to each other, than
-the others. This forms a clustered space, where the number of clusters or their density is unknown for any new dataset,
+The KANNDI (K Approximate Nearest Neighbours DIstance-based) algorithm (read: /ˈkændi/) uses the intuition of multidimensional collocations.
+If points in the input dataset are related with respect to a certain distance (Euclidean, cosine, semantic), 
+intuitively some points will be closer to each other, than the others. 
+This forms a clustered space, where the number of clusters or their density is unknown for any new dataset,
 and is highly dependent on the dataset nature: text based embeddings can be distributed differently than, say, image 
 descriptors.
 
