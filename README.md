@@ -13,4 +13,5 @@ Solutions implemented so far
 Related projects
 ==
 * Billion-Scale ANN Benchmarks: https://github.com/harsha-simhadri/big-ann-benchmarks
-* Million-Scale ANN Benchmarks: https://github.com/DmitryKey/ann-benchmarks
+* Million-Scale ANN Benchmarks: https://github.com/erikbern/ann-benchmarks
+* Getting practical with vector search in Solr and Elasticsearch: https://github.com/DmitryKey/bert-solr-search
