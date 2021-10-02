@@ -116,9 +116,20 @@ def calculate_variance(
     vmax = sorted_vals[0][1]
     vmin = vmax * -1
     sns.set(rc={'figure.figsize':(wd,ht)})
-    heat = sns.heatmap(inv,annot=False,center=0,vmax=vmax,vmin=vmin)
+
+    #heatmap of VIF
+    heat = sns.heatmap(inv,annot=False,center=0,vmax=vmax,vmin=vmin,square=True)
     fig = heat.get_figure()
     fig.savefig(f'multicollinearity_heatmap_{config_file}.png')
+
+    #Only show half
+    for i in range(0,vif.shape[0]):
+        for j in range(i,vif.shape[1]):
+            vif.iloc[i,j] = 0.0
+    heat2 = sns.heatmap(inv,annot=False,center=0,vmax=vmax,vmin=vmin,square=True)
+    fig2 = heat2.get_figure()
+    fig2.savefig(f'multicollinearity_heatmap2_{config_file}.png')
+
 
 if __name__ == "__main__":
     calculate_variance(INDEX_PATH,DATA_FILE,DATA_TYPE)
