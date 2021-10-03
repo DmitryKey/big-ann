@@ -95,7 +95,10 @@ def read_fbin(filename, start_idx=0, chunk_size=None):
         nvecs = (nvecs - start_idx) if chunk_size is None else chunk_size
         arr = np.fromfile(f, count=nvecs * dim, dtype=np.float32,
                           offset=start_idx * 4 * dim)
-    return arr.reshape(nvecs, dim)
+        if arr.size > 0:
+            return arr.reshape(nvecs, dim)
+        else:
+            return np.zeros(shape=(1, dim))
 
 
 # by Leo Joffe
@@ -230,9 +233,8 @@ def add_points(path, name, ids, points):
     """
     Adds a batch of points to a specific shard
     """
-    shardpath = shard_filename(path,name)
+    shardpath = shard_filename(path, name)
     shard = nmslib.init(method='hnsw', space='l2')
-    shard.loadIndex(shardpath, load_data=True)
     shard.addDataPointBatch(points, ids)
     shard.createIndex(print_progress=False)
-    shard.saveIndex(shardpath,save_data=True)
+    shard.saveIndex(shardpath, save_data=True)
