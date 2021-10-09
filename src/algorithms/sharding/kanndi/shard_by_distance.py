@@ -25,25 +25,25 @@ BATCH_SIZE = 1000000
 
 # expected: 1 280 000 008
 # file size: 1 280 0 000 008
-def compute_max_dist(data_file: str, sample_size: int = SAMPLE_SIZE)->float:
+def compute_median_dist(data_file: str, sample_size: int = SAMPLE_SIZE)->float:
     points = read_fbin(data_file, start_idx=0, chunk_size=sample_size)
-    #points = read_bin(filename=data_file, dtype=np.float32, start_idx=0, chunk_size=sample_size)
-    print(points.shape)
+    # points = read_bin(filename=data_file, dtype=np.float32, start_idx=0, chunk_size=sample_size)
+    # print(points.shape)
     num_rows, num_cols = points.shape
-    print(num_rows)
+    # print(num_rows)
 
-    dists = np.sqrt(np.sum((points[None, :] - points[:, None])**2, -1))
-    # dists = []
-    # for i in range(0,num_rows):
-    #    for j in range(1,num_rows-1):
-    #        dist = linalg.norm(points[i]-points[j])
-    #        dists.append(dist)
+    # dists = np.sqrt(np.sum((points[None, :] - points[:, None])**2, -1))
+    dists = []
+    for i in range(0,num_rows):
+        for j in range(1,num_rows-1):
+            dist = linalg.norm(points[i]-points[j])
+            dists.append(dist)
 
     print(dists)
 
     return median(dists.flatten())
 
-
+# objective function | loss function like in K-Means
 def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m: int = M):
     # set of integer order ids of each point that was already placed into a shard => processed
     processed_point_ids = set()
@@ -62,6 +62,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
 
     # expected number of elements per shard
     expected_shard_size = total_num_elements / shards_m
+
+    print("Expected shard size: {}".format(expected_shard_size))
 
     # get the seed point
     points = read_fbin(data_file, start_idx=0, chunk_size=1)
@@ -106,13 +108,15 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
 
                 # check if we saturated the shard
                 if len(shard) == expected_shard_size:
-                    print("Saturated shard with id={}".format(i))
+                    print("Saturated shard with id={}. Building HNSW index for it..".format(i))
                     add_points(output_index_path, str(i), shard_ids, shard)
+                    print("Done")
                     shards[i] = len(shard)
                     need_seed_update = True
                     break
 
             print("Size of current shard after going through the current batch: {}".format(len(shard)))
+            print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())))
 
             # check if we saturated the shard
             if len(shard) == expected_shard_size:
@@ -130,7 +134,7 @@ if __name__ == '__main__':
     points_file = sys.argv[1]
     output_index_path = sys.argv[2]
 
-    computed_dist_max = compute_max_dist(points_file)
+    computed_dist_max = compute_median_dist(points_file)
     print(f"computed {computed_dist_max}")
 
     shard_by_dist(points_file, computed_dist_max, output_index_path)
