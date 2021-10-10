@@ -1,18 +1,21 @@
 import sys
+from enum import Enum
 
 from util.utils import read_fbin, read_bin, get_total_nvecs_fbin, get_total_dim_fbin, add_points
 from numpy import linalg
 from statistics import median
 import numpy as np
+from scipy.spatial import distance_matrix
+
 
 # desired number of shardsCreates a new shard graph for a centroid shard
 # The shard is an HNSW graph with neighborhoods of the parent centroid.
 # The shard is persisted to disk for each addition.
 # The shard is loaded from disk and searched when a query is in its centroid neighborhood.
-M = 1000
+M = 100
 
 # target maximum distance between points to fall inside a shard
-DIST_MAX = 100
+DIST_MULTIPLIER = 10
 
 # number of times to sample the input dataset to approximate the dist_max
 # SAMPLE_TIMES = 10
@@ -28,23 +31,49 @@ BATCH_SIZE = 1000000
 def compute_median_dist(data_file: str, sample_size: int = SAMPLE_SIZE)->float:
     points = read_fbin(data_file, start_idx=0, chunk_size=sample_size)
     # points = read_bin(filename=data_file, dtype=np.float32, start_idx=0, chunk_size=sample_size)
-    # print(points.shape)
     num_rows, num_cols = points.shape
-    # print(num_rows)
+    print("Got the input data matrix: rows = {}, cols = {}".format(num_rows, num_cols))
+    print("Points: {}".format(points))
 
-    # dists = np.sqrt(np.sum((points[None, :] - points[:, None])**2, -1))
+    class DistMethod(Enum):
+        METHOD_NUMPY = 1,
+        METHOD_PAIRWISE_LOOP = 2,
+        SPATIAL_DISTANCE_MATRIX = 3
+
     dists = []
-    for i in range(0,num_rows):
-        for j in range(1,num_rows-1):
-            dist = linalg.norm(points[i]-points[j])
-            dists.append(dist)
 
-    print(dists)
+    method = DistMethod.SPATIAL_DISTANCE_MATRIX
 
-    return median(dists.flatten())
+    if method == DistMethod.METHOD_NUMPY:
+        # Method 1: does not work: computes inf on the diagonal and zeroes elsewhere in the resulting matrix
+        # dists = np.sqrt(np.sum((points[None, :] - points[:, None])**2, -1))
+        dists = np.linalg.norm(points[:, None, :] - points[None, :, :], axis=-1)
+    elif method == DistMethod.METHOD_PAIRWISE_LOOP:
+        # Method 2: O(Nˆ2) iteration
+        # dists = []
+        #for i in range(0, num_rows):
+        #    for j in range(0, num_rows):
+        #        dist = linalg.norm(points[i] - points[j])
+        #        dists.append(dist)
+
+        dists = [linalg.norm(points, 'fro')]
+    elif method == DistMethod.SPATIAL_DISTANCE_MATRIX:
+        dists = distance_matrix(points, points)
+
+    print("Distances: {}", dists)
+    median_dist = median(dists.flatten())
+    print("Median distance: {}", median_dist)
+
+    if median_dist == np.inf:
+        print("Distance computation failed")
+        exit(0)
+
+    return DIST_MULTIPLIER * median_dist
+
 
 # objective function | loss function like in K-Means
 def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m: int = M):
+    VERBOSE = False
     # set of integer order ids of each point that was already placed into a shard => processed
     processed_point_ids = set()
     complete_shards = 0
@@ -69,6 +98,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
     points = read_fbin(data_file, start_idx=0, chunk_size=1)
     seed_point_id = 0
     seed_point = points[seed_point_id]
+    print("Seed point for shard {}: {}".format(seed_point_id, seed_point))
     # remember the seed point
     processed_point_ids.add(seed_point_id)
     shard = [seed_point]
@@ -95,13 +125,18 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                     # update seed point?
                     if need_seed_update:
                         seed_point = points[j]
+                        print("Seed point for shard {}: {}".format(i, seed_point))
                         shard = [seed_point]
                         shard_ids = [i]
                         need_seed_update = False
                     else:
                         # seed is up to date and we continue building the shard
-                        dist_j = linalg.norm(seed_point - points[j])
+                        dist_j = distance_matrix(np.array([seed_point]), np.array([points[j]]))
+                        if VERBOSE:
+                            print("got dist between seed_point and points[j]: {}".format(dist_j))
                         if dist_j <= dist:
+                            if VERBOSE:
+                                print("Got a neighbor!")
                             processed_point_ids.add(candidate_point_id)
                             shard.append(points[j])
                             shard_ids.append(candidate_point_id)
@@ -117,6 +152,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
 
             print("Size of current shard after going through the current batch: {}".format(len(shard)))
             print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())))
+            print("Expected shard size: {}".format(expected_shard_size))
 
             # check if we saturated the shard
             if len(shard) == expected_shard_size:
