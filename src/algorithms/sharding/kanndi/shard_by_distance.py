@@ -6,6 +6,7 @@ from numpy import linalg
 from statistics import median
 import numpy as np
 from scipy.spatial import distance_matrix
+from scipy.spatial.distance import pdist
 
 
 # desired number of shardsCreates a new shard graph for a centroid shard
@@ -15,7 +16,7 @@ from scipy.spatial import distance_matrix
 M = 100
 
 # target maximum distance between points to fall inside a shard
-DIST_MULTIPLIER = 10
+DIST_MULTIPLIER = 1
 
 # number of times to sample the input dataset to approximate the dist_max
 # SAMPLE_TIMES = 10
@@ -29,7 +30,8 @@ BATCH_SIZE = 1000000
 # expected: 1 280 000 008
 # file size: 1 280 0 000 008
 def compute_median_dist(data_file: str, sample_size: int = SAMPLE_SIZE)->float:
-    points = read_fbin(data_file, start_idx=0, chunk_size=sample_size)
+    #points = read_fbin(data_file, start_idx=0, chunk_size=sample_size)
+    points = read_bin(data_file, dtype=np.uint8, start_idx=0, chunk_size=sample_size)
     # points = read_bin(filename=data_file, dtype=np.float32, start_idx=0, chunk_size=sample_size)
     num_rows, num_cols = points.shape
     print("Got the input data matrix: rows = {}, cols = {}".format(num_rows, num_cols))
@@ -58,7 +60,8 @@ def compute_median_dist(data_file: str, sample_size: int = SAMPLE_SIZE)->float:
 
         dists = [linalg.norm(points, 'fro')]
     elif method == DistMethod.SPATIAL_DISTANCE_MATRIX:
-        dists = distance_matrix(points, points)
+        #dists = distance_matrix(points, points)
+        dists = pdist(points)
 
     print("Distances: {}", dists)
     median_dist = median(dists.flatten())
@@ -95,7 +98,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
     print("Expected shard size: {}".format(expected_shard_size))
 
     # get the seed point
-    points = read_fbin(data_file, start_idx=0, chunk_size=1)
+    #points = read_fbin(data_file, start_idx=0, chunk_size=1)
+    points = read_bin(data_file, dtype=np.uint8, start_idx=0, chunk_size=1)
     seed_point_id = 0
     seed_point = points[seed_point_id]
     print("Seed point for shard {}: {}".format(seed_point_id, seed_point))
@@ -106,16 +110,23 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
 
     need_seed_update = False
 
+    # holds points that do not form a complete shard
+    special_shard = []
+
+    # number of batches, during which this shard is not growing
+    # TODO
+
     # repeat, while number of shards did not reach the target level M
     while complete_shards < shards_m:
         complete_shards = len(shards.keys())
 
         # step through the dataset with batch by batch
         for i in range(0, range_upper, BATCH_SIZE):
-            print(f"Processing index={i}")
-            points = read_fbin(data_file, start_idx=i, chunk_size=BATCH_SIZE)
+            print(f"Processing index={i}", flush=True)
+            #points = read_fbin(data_file, start_idx=i, chunk_size=BATCH_SIZE)
+            points = read_bin(data_file, dtype=np.uint8, start_idx=i, chunk_size=BATCH_SIZE)
 
-            print("going inside inner loop by j over current batch of points, skipping the seed point")
+            print("going inside inner loop by j over current batch of points, skipping the seed point", flush=True)
             for j in range(0, points.shape[0]):
                 if j == seed_point_id:
                     continue
@@ -150,16 +161,24 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                     need_seed_update = True
                     break
 
-            print("Size of current shard after going through the current batch: {}".format(len(shard)))
-            print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())))
-            print("Expected shard size: {}".format(expected_shard_size))
+            print("Size of the current shard after going through the current batch: {}".format(len(shard)), flush=True)
+            print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
+            print("Expected shard size: {}".format(expected_shard_size), flush=True)
 
             # check if we saturated the shard
             if len(shard) == expected_shard_size:
                 add_points(output_index_path, str(i), shard_ids, shard)
                 shards[i] = len(shard)
 
-    print("Processed points: {}".format(len(processed_point_ids)))
+        # we reached the end of the whole dataset and can stash existing points into some "special shard"
+        if len(shard) < expected_shard_size:
+            print("After going through the whole dataset, the shard did not saturate, at size: {}".format(len(shard)), flush=True)
+            special_shard.append(shard)
+            print("Appended to the special_shard, its running size: {}".format(len(special_shard)))
+            # request to update seed point
+            need_seed_update = True
+
+    print("Processed this many points: {}".format(len(processed_point_ids)), flush=True)
 
 
 if __name__ == '__main__':
