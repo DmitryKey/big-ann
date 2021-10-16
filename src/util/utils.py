@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 from sklearn.preprocessing import normalize
 import struct
@@ -12,7 +14,7 @@ def ts():
     """
     Gets an ISO string timestamp, helps with seeing how long things took to run
     """
-    return str(datetime.datetime.now());
+    return str(datetime.datetime.now())
 
 
 def get_solr_vector_search(bert_client, query):
@@ -229,12 +231,20 @@ def shard_filename(path,name):
     return f'{path}shard{name}.hnsw'
 
 
-def add_points(path, name, ids, points):
+class Shard:
+    def __init__(self, shard_id: int, point_ids: list, points):
+        self.shardid = shard_id
+        self.pointids = point_ids
+        self.points = points
+        self.size = len(points)
+
+
+def add_points(path, shard: Shard):
     """
     Adds a batch of points to a specific shard
     """
-    shardpath = shard_filename(path, name)
+    shardpath = shard_filename(path, shard.shardid)
     shard = nmslib.init(method='hnsw', space='l2')
-    shard.addDataPointBatch(points, ids)
+    shard.addDataPointBatch(shard.points, shard.pointids)
     shard.createIndex(print_progress=False)
     shard.saveIndex(shardpath, save_data=True)
