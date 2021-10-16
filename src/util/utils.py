@@ -244,7 +244,7 @@ def add_points(path, shard: Shard):
     Adds a batch of points to a specific shard
     """
     shardpath = shard_filename(path, shard.shardid)
-    shard = nmslib.init(method='hnsw', space='l2')
-    shard.addDataPointBatch(shard.points, shard.pointids)
-    shard.createIndex(print_progress=False)
-    shard.saveIndex(shardpath, save_data=True)
+    index = nmslib.init(method='hnsw', space='l2')
+    index.addDataPointBatch(shard.points, shard.pointids)
+    index.createIndex(print_progress=False)
+    index.saveIndex(shardpath, save_data=True)
