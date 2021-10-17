@@ -98,8 +98,8 @@ Saturated shard with id=13. Building HNSW index for it..
 Done
 ```
 
-While in later stages the algorithm tends to process more batches to saturate the shard, but each 
-batch (of 1M points in this experiment) get processed quite rapidly (TODO: add time measurements):
+While in later stages the algorithm tends to process more batches to saturate the shard, each 
+batch (of 1M points in this experiment) gets processed more rapidly (TODO: add time measurements):
 
 ```
 Seed point for shard 67000000: [ 23  69  57   0   0   0   0   3   4  45  69   2   0   1   8   6   0   1
@@ -178,3 +178,30 @@ Processing index=78000000
 going inside inner loop by j over current batch of points, skipping the seed point
 Saturated shard with id=77. Building HNSW index for it..
 ```
+
+If algorithm gets stuck on a starving shard, its points will get pushed to a special_shard and new seed points it chosen:
+
+```
+Processing index=99000000
+going inside inner loop by j over current batch of points, skipping the seed point
+Size of the current shard after going through the current batch: 1
+Shards built so far: {0: 1000000, 1: 1000000, 2: 1000000, 3: 1000000, 4: 1000000, 5: 1000000, 6: 1000000, 7: 1000000, 8: 1000000, 9: 1000000, 10: 1000000, 11: 1000000, 12: 1000000, 13: 1000000, 14: 1000000, 15: 1000000, 16: 1000000, 17: 1000000, 18: 1000000, 19: 1000000, 20: 1000000, 21: 1000000, 22: 1000000, 23: 1000000, 24: 1000000, 25: 1000000, 26: 1000000, 27: 1000000, 28: 1000000, 29: 1000000, 30: 1000000, 31: 1000000, 32: 1000000, 33: 1000000, 34: 1000000, 35: 1000000, 36: 1000000, 37: 1000000, 38: 1000000, 39: 1000000, 40: 1000000, 41: 1000000, 42: 1000000, 43: 1000000, 44: 1000000, 45: 1000000, 46: 1000000, 47: 1000000, 48: 1000000, 49: 1000000, 50: 1000000, 51: 1000000, 52: 1000000, 53: 1000000, 54: 1000000, 55: 1000000, 56: 1000000, 57: 1000000, 58: 1000000, 59: 1000000, 60: 1000000, 61: 1000000, 62: 1000000, 63: 1000000, 64: 1000000, 65: 1000000, 66: 1000000, 67: 1000000, 68: 1000000, 69: 1000000, 70: 1000000, 71: 1000000, 72: 1000000, 73: 1000000, 74: 1000000, 75: 1000000, 76: 1000000, 77: 1000000, 78: 1000000, 79: 1000000, 80: 1000000, 81: 1000000, 82: 1000000, 83: 1000000, 84: 1000000, 85: 1000000} with 86 keys
+Expected shard size: 1000000.0
+!!! After going through the whole dataset, the shard did not saturate, at size: 1
+!!! Appended to the special_shard, its running size: 10
+Processing index=0
+going inside inner loop by j over current batch of points, skipping the seed point
+Seed point for shard 0: [ 41  38  21  17  42  71  60  50  11   1   2  11 109 115   8   4  27   8
+   5  22  11   9   8  14  20  10   4  33  12   7   4   1  18 115  95  42
+  17   1   0   0  19   6  46 115  91  16   0   7  66   7   4  15  12  32
+  91 109  12   3   1   8  21 115  96  17   1  51  78  14   0   0   0   0
+  50  40  62  53   0   0   0   3 115 115  40  12   6  13  25  65   7  30
+  51  65 110  92  25   9   0   1  13   0   0   0   0   0   4  22  11   1
+   0   0   0   0  13 115  48   1   0   0   0   0   0  36 102  63  11   0
+   0   0]
+```
+
+TODO: this part can be improved by choosing the next seed point smarter, say with approximating the probability 
+of a shard "centroid". One way to do this is to measure the median distance over a sample of remaining points and
+readjust the distance `d`.
+
