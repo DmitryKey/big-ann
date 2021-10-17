@@ -39,7 +39,7 @@ SEARCHING
 4. Form a list from all the shards that participated in the search and re-sort the list with respect to the true distance from `p*`.
 5. Return top 10.
 
-Experiments
+Experiment: Indexing
 ===
 
 Dataset: BIGANN, uint8, 128 dimensions, L2 distance
