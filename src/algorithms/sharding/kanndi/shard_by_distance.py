@@ -118,18 +118,17 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
     # TODO
 
     # repeat, while number of shards did not reach the target level M
-    while complete_shards < shards_m:
-        complete_shards = len(shards.keys())
-
+    while len(shards.keys()) < shards_m:
         # step through the dataset with batch by batch
         for i in range(0, range_upper, BATCH_SIZE):
-            print(f"Processing index={i}", flush=True)
+            print(f"\nProcessing index={i}", flush=True)
 
             points = read_bin(data_file, dtype=np.uint8, start_idx=i, chunk_size=BATCH_SIZE)
 
-            print("going inside inner loop by j over current batch of points, skipping the seed point", flush=True)
+            print("going inside inner loop by j over current batch of points", flush=True)
             for j in range(0, points.shape[0]):
                 if j == seed_point_id:
+                    print("skipping the seed point", flush=True)
                     continue
                 # id of the shard candidate is a combination of the running i-th batch and offset j within it
                 candidate_point_id = i + j
@@ -157,28 +156,33 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                 if len(shard_points) == expected_shard_size:
                     shard = Shard(shard_id, shard_point_ids, shard_points)
                     shard_id = add_shard(output_index_path, shard)
+                    # reset the points arr
+                    shard_points = []
                     shards[shard.shardid] = shard.size
                     shard_id += 1
                     need_seed_update = True
+                    print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
                     break
 
             print("Size of the current shard after going through the current batch: {}".format(len(shard_points)), flush=True)
-            print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
             print("Expected shard size: {}".format(expected_shard_size), flush=True)
 
             # check if we saturated the shard
             if len(shard_points) == expected_shard_size:
                 shard = Shard(shard_id, shard_point_ids, shard_points)
                 shard_id = add_shard(output_index_path, shard)
+                # reset the points arr
+                shard_points = []
                 shards[shard.shardid] = shard.size
                 shard_id += 1
                 need_seed_update = True
+                print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
 
         # we reached the end of the whole dataset and can stash existing points into some "special shard"
         if len(shard_points) < expected_shard_size:
-            print("After going through the whole dataset, the shard did not saturate, at size: {}".format(len(shard_points)), flush=True)
+            print("!!! After going through the whole dataset, the shard did not saturate, at size: {}".format(len(shard_points)), flush=True)
             special_shard_points.append(shard_points)
-            print("Appended to the special_shard, its running size: {}".format(len(special_shard_points)))
+            print("!!! Appended to the special_shard, its running size: {}".format(len(special_shard_points)), flush=True)
             # request to update seed point
             need_seed_update = True
 
