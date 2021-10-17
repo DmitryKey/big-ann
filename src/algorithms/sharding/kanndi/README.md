@@ -31,6 +31,13 @@ INDEXING
 7. Some shards might be "starving", which will reflect absence of clusters. However, we still have an upper bound for the size of each shard, which is important.
 8. Use the HNSW algorithm to surface the entry point to each shard.
 
+Notes on indexing:
+1. Some shards will be more dense, in terms of the median distance, than others. 
+2. You can think of this as a galaxy with smaller distances between its planets, while another galaxy has larger distances between its planets.
+3. Starving shards might end up either incomplete (but with saturation > 75% -- hyperparameter) or merged with another starving shard (through `special_shard_points`).
+4. Median distance gets recomputed when need arises. The condition being: last shard was starving and did not reach 75%.
+5. The act of recomputating the median distance points to the galaxy with increased distances between its planets.
+
 SEARCHING
 ===
 1. For input multidimensional point `p*` make a pass over all entry points -- exactly `M` of them.

@@ -232,7 +232,7 @@ def shard_filename(path,name):
 
 
 class Shard:
-    def __init__(self, shard_id: int, point_ids: list, points):
+    def __init__(self, shard_id: int, point_ids: list, points: List[list]):
         self.shardid = shard_id
         self.pointids = point_ids
         self.points = points
