@@ -36,7 +36,7 @@ Notes on indexing:
 2. You can think of this as a galaxy with smaller distances between its planets, while another galaxy has larger distances between its planets.
 3. Starving shards might end up either incomplete (but with saturation > 75% -- hyperparameter) or merged with another starving shard (through `special_shard_points`).
 4. Median distance gets recomputed when need arises. The condition being: last shard was starving and did not reach 75%.
-5. The act of recomputating the median distance points to the galaxy with increased distances between its planets.
+5. The act of recomputing the median distance suggests the galaxy with increased distances between its planets.
 
 SEARCHING
 ===
