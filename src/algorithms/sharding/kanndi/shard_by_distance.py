@@ -17,7 +17,7 @@ from scipy.spatial.distance import pdist
 M = 100
 
 # target maximum distance between points to fall inside a shard
-DIST_MULTIPLIER = 1
+DIST_MULTIPLIER = 2
 
 # size of the sample of points examined linearly during max dist computation
 SAMPLE_SIZE = 10000
@@ -72,7 +72,7 @@ def compute_median_dist(points)->float:
         print("Distance computation failed")
         exit(0)
 
-    return DIST_MULTIPLIER * median_dist
+    return median_dist
 
 
 # objective function | loss function like in K-Means
@@ -116,6 +116,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
 
     # holds points that do not form a complete shard
     special_shard_points = []
+    special_shard_point_ids = []
 
     # number of batches, during which this shard is not growing -- terminate?
     # TODO
@@ -142,7 +143,12 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                     computed_dist_max = compute_median_dist(np.array(points_to_resample))
                     print(f"computed {computed_dist_max}", flush=True)
                     print("Updating median distance to this value")
-                    dist = computed_dist_max
+                    if computed_dist_max > dist:
+                        dist = computed_dist_max
+                    else:
+                        # fallback:
+                        dist = DIST_MULTIPLIER * dist
+                        print(f"Increased the dist to 2x: {dist}", flush=True)
                     # unset the starving shard flat to actually start using this new re-sampled median distance
                     is_last_shard_starving = False
             else:
@@ -185,6 +191,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                         shard_id += 1
                         need_seed_update = True
                         is_last_shard_starving = False
+                        shard_saturation_percent = 0
                         print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
                         break
 
@@ -206,6 +213,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                     shard_id += 1
                     need_seed_update = True
                     is_last_shard_starving = False
+                    shard_saturation_percent = 0
                     print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
 
         # we reached the end of the whole dataset and can stash existing points into some "special shard"
@@ -220,13 +228,26 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                 shard_id += 1
                 need_seed_update = True
                 is_last_shard_starving = False
+                shard_saturation_percent = 0
                 print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
             else:
                 # save the current starving shards' points only if we have them ;)
                 if len(shard_points) > 0:
                     # TODO: apply same saturation threshold as for normal shards?
                     special_shard_points.extend(shard_points)
+                    special_shard_point_ids.extend(shard_point_ids)
                     print("!!! Appended to the special_shard, its running size: {}".format(len(special_shard_points)), flush=True)
+                    special_shard_saturation_percent = (len(special_shard_points) / expected_shard_size) * 100
+                    if special_shard_saturation_percent > SHARD_SATURATION_PERCENT_MINIMUM:
+                        shard = Shard(shard_id, special_shard_point_ids, special_shard_points)
+                        shard_id = add_shard(output_index_path, shard)
+                        # reset the points arr
+                        special_shard_points = []
+                        shards[shard.shardid] = shard.size
+                        shard_id += 1
+                        special_shard_saturation_percent = 0
+                        print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
+
                 need_seed_update = True
                 is_last_shard_starving = True
 
