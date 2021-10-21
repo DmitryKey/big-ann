@@ -2,12 +2,13 @@ import sys
 from enum import Enum
 from typing import List
 
-from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard
+from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, display_top
 from numpy import linalg
 from statistics import median
 import numpy as np
 from scipy.spatial import distance_matrix
 from scipy.spatial.distance import pdist
+import tracemalloc
 
 
 # desired number of shardsCreates a new shard graph for a centroid shard
@@ -77,6 +78,7 @@ def compute_median_dist(points)->float:
 
 # objective function | loss function like in K-Means
 def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m: int = M):
+    tracemalloc.start()
     # set of integer order ids of each point that was already placed into a shard => processed
     processed_point_ids = set()
     complete_shards = 0
@@ -125,6 +127,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
     while len(shards.keys()) < shards_m:
         # step through the dataset with batch by batch
         for i in range(0, range_upper, BATCH_SIZE):
+            snapshot = tracemalloc.take_snapshot()
+            display_top(tracemalloc, snapshot)
             print(f"\nProcessing index={i}", flush=True)
 
             points = read_bin(data_file, dtype=np.uint8, start_idx=i, chunk_size=BATCH_SIZE)
@@ -186,6 +190,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                         shard = Shard(shard_id, shard_point_ids, shard_points)
                         shard_id = add_shard(output_index_path, shard)
                         # reset the points arr
+                        del shard_points
                         shard_points = []
                         shards[shard.shardid] = shard.size
                         shard_id += 1
@@ -208,6 +213,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                     shard = Shard(shard_id, shard_point_ids, shard_points)
                     shard_id = add_shard(output_index_path, shard)
                     # reset the points arr
+                    del shard_points
                     shard_points = []
                     shards[shard.shardid] = shard.size
                     shard_id += 1
@@ -223,6 +229,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                 shard = Shard(shard_id, shard_point_ids, shard_points)
                 shard_id = add_shard(output_index_path, shard)
                 # reset the points arr
+                del shard_points
                 shard_points = []
                 shards[shard.shardid] = shard.size
                 shard_id += 1
@@ -250,6 +257,9 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
 
                 need_seed_update = True
                 is_last_shard_starving = True
+
+        snapshot = tracemalloc.take_snapshot()
+        display_top(tracemalloc, snapshot)
 
     print("Processed this many points: {}".format(len(processed_point_ids)), flush=True)
 
