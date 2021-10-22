@@ -8,6 +8,7 @@ from scipy.spatial import distance_matrix
 from scipy.spatial.distance import pdist
 import tracemalloc
 import argparse
+import gc
 
 
 # desired number of shardsCreates a new shard graph for a centroid shard
@@ -126,8 +127,10 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
     while len(shards.keys()) < shards_m:
         # step through the dataset with batch by batch
         for i in range(0, range_upper, BATCH_SIZE):
-            snapshot = tracemalloc.take_snapshot()
-            display_top(tracemalloc, snapshot)
+            # Detailed mem check takes too long time: switched off
+            # snapshot = tracemalloc.take_snapshot()
+            # display_top(tracemalloc, snapshot)
+
             print(f"\nProcessing index={i}", flush=True)
 
             points = read_bin(data_file, dtype=np.uint8, start_idx=i, chunk_size=BATCH_SIZE)
@@ -189,7 +192,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                         shard = Shard(shard_id, shard_point_ids, shard_points)
                         shard_id = add_shard(output_index_path, shard)
                         # reset the points arr
-                        # del shard_points
+                        del shard_points
+                        gc.collect()
                         shard_points = []
                         shards[shard.shardid] = shard.size
                         shard_id += 1
@@ -212,7 +216,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                     shard = Shard(shard_id, shard_point_ids, shard_points)
                     shard_id = add_shard(output_index_path, shard)
                     # reset the points arr
-                    # del shard_points
+                    del shard_points
+                    gc.collect()
                     shard_points = []
                     shards[shard.shardid] = shard.size
                     shard_id += 1
@@ -228,7 +233,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                 shard = Shard(shard_id, shard_point_ids, shard_points)
                 shard_id = add_shard(output_index_path, shard)
                 # reset the points arr
-                # del shard_points
+                del shard_points
+                gc.collect()
                 shard_points = []
                 shards[shard.shardid] = shard.size
                 shard_id += 1
