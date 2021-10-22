@@ -1,7 +1,5 @@
 import sys
 from enum import Enum
-from typing import List
-
 from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, display_top
 from numpy import linalg
 from statistics import median
@@ -9,13 +7,14 @@ import numpy as np
 from scipy.spatial import distance_matrix
 from scipy.spatial.distance import pdist
 import tracemalloc
+import argparse
 
 
 # desired number of shardsCreates a new shard graph for a centroid shard
 # The shard is an HNSW graph with neighborhoods of the parent centroid.
 # The shard is persisted to disk for each addition.
 # The shard is loaded from disk and searched when a query is in its centroid neighborhood.
-M = 100
+M = 1000
 
 # target maximum distance between points to fall inside a shard
 DIST_MULTIPLIER = 2
@@ -190,7 +189,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                         shard = Shard(shard_id, shard_point_ids, shard_points)
                         shard_id = add_shard(output_index_path, shard)
                         # reset the points arr
-                        del shard_points
+                        # del shard_points
                         shard_points = []
                         shards[shard.shardid] = shard.size
                         shard_id += 1
@@ -213,7 +212,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                     shard = Shard(shard_id, shard_point_ids, shard_points)
                     shard_id = add_shard(output_index_path, shard)
                     # reset the points arr
-                    del shard_points
+                    # del shard_points
                     shard_points = []
                     shards[shard.shardid] = shard.size
                     shard_id += 1
@@ -229,7 +228,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
                 shard = Shard(shard_id, shard_point_ids, shard_points)
                 shard_id = add_shard(output_index_path, shard)
                 # reset the points arr
-                del shard_points
+                # del shard_points
                 shard_points = []
                 shards[shard.shardid] = shard.size
                 shard_id += 1
@@ -275,15 +274,24 @@ def add_shard(output_index_path, shard):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print("Expect two params: (1) an input points file (2) an output index path")
-        exit(0)
 
-    points_file = sys.argv[1]
-    output_index_path = sys.argv[2]
+    parser = argparse.ArgumentParser(description='Process some neighbours.')
+    parser.add_argument('--input_file', help='input file with the multidimensional points', required=True)
+    parser.add_argument('--output_dir', help='where to store the index', required=True)
+    parser.add_argument('-M', type=int, help="expected number of shards, say 1000", required=True)
+
+    args = parser.parse_args()
+    print(args)
+    #if len(sys.argv) < 3:
+    #    print("Expect two params: (1) an input points file (2) an output index path")
+    #    exit(0)
+
+    points_file = args.input_file
+    output_index_path = args.output_dir
+    shards_number = args.M
 
     points = read_bin(points_file, dtype=np.uint8, start_idx=0, chunk_size=SAMPLE_SIZE)
     computed_dist_max = compute_median_dist(points)
     print(f"computed {computed_dist_max}", flush=True)
 
-    shard_by_dist(points_file, computed_dist_max, output_index_path)
+    shard_by_dist(points_file, computed_dist_max, output_index_path, shards_m=shards_number)
