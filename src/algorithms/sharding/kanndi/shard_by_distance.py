@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, display_top
+from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, display_top, read_fbin
 from numpy import linalg
 from statistics import median
 import numpy as np
@@ -77,11 +77,12 @@ def compute_median_dist(points)->float:
 
 
 # objective function | loss function like in K-Means
-def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m: int = M):
+def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.dtype, shards_m: int = M):
     tracemalloc.start()
     # set of integer order ids of each point that was already placed into a shard => processed
     processed_point_ids = set()
     complete_shards = 0
+
 
     total_num_elements = get_total_nvecs_fbin(data_file)
     # dimensionality = get_total_dim_fbin(data_file)
@@ -100,7 +101,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, shards_m:
     print("Expected shard size: {}".format(expected_shard_size), flush=True)
 
     # get the seed point, which initially is the first point of the dataset
-    points = read_bin(data_file, dtype=np.uint8, start_idx=0, chunk_size=1)
+    points = read_bin(data_file, dtype=dtype, start_idx=0, chunk_size=1)
     seed_point_id = 0
     seed_point = points[seed_point_id]
     print("Seed point for shard {}: {}".format(seed_point_id, seed_point), flush=True)
@@ -285,6 +286,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_file', help='input file with the multidimensional points', required=True)
     parser.add_argument('--output_dir', help='where to store the index', required=True)
     parser.add_argument('-M', type=int, help="expected number of shards, say 1000", required=True)
+    parser.add_argument('--dtype', type=str, help="dataset dtype: uint8, float32, int8", required=True)
 
     args = parser.parse_args()
     print(args)
@@ -295,9 +297,22 @@ if __name__ == '__main__':
     points_file = args.input_file
     output_index_path = args.output_dir
     shards_number = args.M
+    dtype = args.dtype
+    req_type = None
 
-    points = read_bin(points_file, dtype=np.uint8, start_idx=0, chunk_size=SAMPLE_SIZE)
+    if dtype == "float32":
+        req_dtype = np.float32
+        points = read_fbin(points_file, start_idx=0, chunk_size=SAMPLE_SIZE)
+    elif dtype == "uint8":
+        req_dtype = np.uint8
+        points = read_bin(points_file, dtype=req_dtype, start_idx=0, chunk_size=SAMPLE_SIZE)
+    else:
+        print("Unsupported data type.")
+        exit(0)
+
+
+
     computed_dist_max = compute_median_dist(points)
     print(f"computed {computed_dist_max}", flush=True)
 
-    shard_by_dist(points_file, computed_dist_max, output_index_path, shards_m=shards_number)
+    shard_by_dist(points_file, computed_dist_max, output_index_path, dtype=req_dtype, shards_m=shards_number)
