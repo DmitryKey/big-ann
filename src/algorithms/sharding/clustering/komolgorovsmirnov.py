@@ -95,14 +95,22 @@ def calculate_komolgorovsmirnov(
         #Scalar values of a specific dimension for all points
         dim_points = points[:,dim]
 
-        #Compare with every other dimension's variance:
+        #Compare with every other dimension:
         for dim2 in range(total_num_dimensions):
+            
             print(dim,dim2)
+
             if dim==dim2:
+                #same dim
                 ks[dim,dim2] = 0
-            dim2_points = points[:,dim2]
-            ksresult = kstest(dim_points,dim2_points)
-            ks[dim,dim2] = ksresult.statistic
+            elif dim>dim2:
+                #already seen
+                ks[dim,dim2] = ks[dim2,dim]
+            else:
+                #ks test dim vs dim2
+                dim2_points = points[:,dim2]
+                ksresult = kstest(dim_points,dim2_points)
+                ks[dim,dim2] = ksresult.statistic
 
     df = pd.DataFrame(ks, index = list(range(total_num_dimensions)), columns=list(range(total_num_dimensions)))
     df.to_csv(f'komolgorovsmirnov_{config_file}.csv')
