@@ -96,27 +96,29 @@ def calculate_variance(
     A = np.linalg.inv(cor.values)
 
     #Build the network of buddies from the multicollinearity
-    friends = []
-    p = np.percentile(np.abs(A.flatten()),95)
+    buddies = []
     G = nx.Graph()
+    p = np.percentile(np.abs(A.flatten()),75)
     for i in range(total_num_dimensions):
         for j in range(total_num_dimensions):
             if i == j:
                 continue
             if A[i,j] > p:
-                G.add_edge(i,j,w=A[i,j])
+                G.add_edge(i,j,w=A[i,j])    
     Gs = sorted([[A[e],e] for e in G.edges()],reverse=True)  #ordered by highest weighted edges first
     for e in Gs:
-        l = e[1]
-        if l[0] not in friends: #make sure the node has not been added yet
-            friends.append(l[0]) #add the node
-            for n in G.neighbors(l[0]): #for all the neighbors (unsorted?)
-                if n not in friends: #add the neighbor if it has not yet been added
-                    friends.append(n)
-    friends += [i for i in range(total_num_dimensions) if i not in friends] #include any missing dimensions
-    print(len(friends))
-    print(friends)
-
+        l = e[1] #node tuple
+        n = l[0] #right node
+        if n not in buddies: #make sure the node has not been added yet
+            buddies.append(n) #add the node
+            bestest = sorted(G[n].items(), key=lambda item: item[1]['w'], reverse=True) #neighbors sorted by desc weight
+            for b in bestest: #for all the closest neighbors
+                f = b[0] #neighbor node
+                if f not in buddies: #add the neighbor node if it has not yet been added
+                    buddies.append(f)
+    buddies += [i for i in range(total_num_dimensions) if i not in buddies] #include any missing nodes
+    print(len(buddies))
+    print(buddies)
 
 if __name__ == "__main__":
     calculate_variance(INDEX_PATH,DATA_FILE,DATA_TYPE)
