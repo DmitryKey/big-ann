@@ -252,6 +252,21 @@ def add_points(path, shard: Shard):
     index.saveIndex(shardpath, save_data=True)
 
 
+# Loads index from disk
+def load_index(filename):
+    index = nmslib.init(method='hnsw', space='l2')
+    index.createIndex(print_progress=True)
+    index.loadIndex(filename)
+    return index
+
+
+# Searches the given shard
+def query_shard(shard_name, query):
+    shard = nmslib.init(method='hnsw', space='l2')
+    shard.loadIndex(shard_name, load_data=True)
+    results, distances = shard.knnQuery(query, k=10)
+    return results, distances
+
 # RAM consumption monitoring
 # credit: https://stackoverflow.com/a/45679009/158328
 def display_top(tracemalloc, snapshot, key_type='lineno', limit=3):
