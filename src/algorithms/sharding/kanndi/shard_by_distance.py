@@ -114,6 +114,11 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
     shard_point_ids = [shard_id]
     shard_saturation_percent = 0
 
+    # all seed points, that are by design cluster centroids
+    # these seed points will be stored as a separate HNSW graph
+    all_seed_points = [seed_point]
+    all_seed_points_ids = [shard_id]
+
     need_seed_update = False
     is_last_shard_starving = False
 
@@ -153,7 +158,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     if computed_dist_max > dist:
                         dist = computed_dist_max
                     else:
-                        # fallback:
+                        # fallback: apply distance multiplier to increase the chances we will make this
                         dist = DIST_MULTIPLIER * dist
                         print(f"Increased the dist to 2x: {dist}", flush=True)
                     # unset the starving shard flat to actually start using this new re-sampled median distance
@@ -174,6 +179,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                             seed_point = points[j]
                             print("Seed point for shard {}: {}".format(i, seed_point))
                             shard_points = [seed_point]
+                            all_seed_points.append(seed_point)
+                            all_seed_points_ids.append(shard_id)
                             shard_point_ids = [i]
                             need_seed_update = False
                         else:
@@ -267,6 +274,11 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
         snapshot = tracemalloc.take_snapshot()
         display_top(tracemalloc, snapshot)
 
+    # save the centroid graph
+    centroid_shard = Shard(-1, all_seed_points_ids, all_seed_points)
+    add_shard(output_index_path, centroid_shard)
+    print("Saved centroid shard with {} points".format(len(centroid_shard.pointids)))
+
     print("Processed this many points: {}".format(len(processed_point_ids)), flush=True)
 
 
@@ -290,9 +302,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     print(args)
-    #if len(sys.argv) < 3:
-    #    print("Expect two params: (1) an input points file (2) an output index path")
-    #    exit(0)
 
     points_file = args.input_file
     output_index_path = args.output_dir
