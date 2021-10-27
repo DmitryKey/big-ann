@@ -17,7 +17,7 @@ def ts():
 
 # Renders the filename of the centroids (seed points, remember?) shard
 def centroids_filename(path):
-    return f'{path}-1.hnsw'
+    return f'{path}shard-1.hnsw'
 
 
 # Renders the filename for a shard
@@ -52,10 +52,13 @@ def query_index(path, query_file, dtype, k=10):
         results, result_distances = query_shard(shard_name, query)
 
         # log results
-        print(f'Found {qnum} in shard {centroids[0]}: {results[0]} {result_distances[0]} at {ts()}')
+        print(f'\nFound {query} in shard {centroids[0]}: '
+              f'closest point: {results[0]} with the distance of {result_distances[0]} at {ts()}')
+        print('All results for this query')
         for i in range(len(results)):
             print(f'{qnum} result {i} :: {result_distances[i]} {results[i]}')
         qnum += 1
+        print('--------------------------------')
 
     print(f"Done! {ts()}")
     end_time = datetime.datetime.now().timestamp()
@@ -72,4 +75,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    query_index(parser.index_dir, parser.query_file, parser.dtype)
+    query_index(args.index_dir, args.query_file, args.dtype)
