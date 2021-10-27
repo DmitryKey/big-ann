@@ -81,11 +81,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
     tracemalloc.start()
     # set of integer order ids of each point that was already placed into a shard => processed
     processed_point_ids = set()
-    complete_shards = 0
-
-
     total_num_elements = get_total_nvecs_fbin(data_file)
-    # dimensionality = get_total_dim_fbin(data_file)
     print(f"Total number of points to process: {total_num_elements}", flush=True)
     print(f"Reading data from {data_file} in {BATCH_SIZE} chunks", flush=True)
 
