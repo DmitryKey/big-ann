@@ -1,7 +1,7 @@
-from numpy import float32
+from numpy import uint8
 ###
 #
-# BIGANN small test config! Run it on your personal machine like this:
+# MSSPACEV1B small test config! Run it on your personal machine like this:
 # `python3 centroids.py config_bigann_small`
 # `python3 shard.py config_bigann_small`
 #
@@ -26,9 +26,9 @@ MAX_ITER=25
 MAX_POINTS=20000
 
 #Path to the datafiles
-DATA_TYPE=float32
-DATA_FILE="../data/MSTuringANNS/base1b.fbin.crop_nb_10000000"
-QUERY_FILE="../data/MSTuringANNS/query100K.fbin"
+DATA_TYPE=uint8
+DATA_FILE="../data/MSSPACEV1B/spacev1b_base.i8bin.crop_nb_10000000"
+QUERY_FILE="../data/MSSPACEV1B/query.i8bin"
 
 #Path to the centroid index shard data
 INDEX_PATH="../data/shards/"
