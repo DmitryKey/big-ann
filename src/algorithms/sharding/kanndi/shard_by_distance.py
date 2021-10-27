@@ -139,16 +139,16 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
 
             print(f"\nProcessing index={i}", flush=True)
 
-            points = read_bin(data_file, dtype=np.uint8, start_idx=i, chunk_size=BATCH_SIZE)
+            in_loop_points = read_bin(data_file, dtype=np.uint8, start_idx=i, chunk_size=BATCH_SIZE)
 
             # if last shard was starving, then
             if is_last_shard_starving:
                 # re-compute the median distance in this batch, excluding points that were already processed
                 points_to_resample = []
-                for j in range(0, points.shape[0]):
+                for j in range(0, in_loop_points.shape[0]):
                     candidate_point_id = i + j
                     if candidate_point_id not in processed_point_ids:
-                        points_to_resample.append(points[j])
+                        points_to_resample.append(in_loop_points[j])
                         if len(points_to_resample) == SAMPLE_SIZE:
                             break
                 if len(points_to_resample) == SAMPLE_SIZE:
@@ -165,7 +165,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     is_last_shard_starving = False
             else:
                 print("going inside inner loop by j over current batch of points", flush=True)
-                for j in range(0, points.shape[0]):
+                for j in range(0, in_loop_points.shape[0]):
                     # id of the shard candidate is a combination of the running i-th batch and offset j within it
                     candidate_point_id = i + j
 
@@ -176,7 +176,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     if candidate_point_id not in processed_point_ids:
                         # update seed point?
                         if need_seed_update:
-                            seed_point = points[j]
+                            seed_point = in_loop_points[j]
                             print("Seed point for shard {}: {}".format(i, seed_point))
                             shard_points = [seed_point]
                             all_seed_points.append(seed_point)
@@ -185,14 +185,14 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                             need_seed_update = False
                         else:
                             # seed is up to date and we continue building the shard
-                            dist_j = distance_matrix(np.array([seed_point]), np.array([points[j]]))
+                            dist_j = distance_matrix(np.array([seed_point]), np.array([in_loop_points[j]]))
                             if VERBOSE:
                                 print("got dist between seed_point and points[{}]: {}".format(j, dist_j))
                             if dist_j <= dist:
                                 if VERBOSE:
                                     print("Got a neighbor!")
                                 processed_point_ids.add(candidate_point_id)
-                                shard_points.append(points[j])
+                                shard_points.append(in_loop_points[j])
                                 shard_point_ids.append(candidate_point_id)
 
                     # check if we saturated the shard
@@ -318,8 +318,6 @@ if __name__ == '__main__':
     else:
         print("Unsupported data type.")
         exit(0)
-
-
 
     computed_dist_max = compute_median_dist(points)
     print(f"computed {computed_dist_max}", flush=True)
