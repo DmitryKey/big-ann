@@ -10,6 +10,7 @@ import math
 import nmslib
 import linecache
 import os
+import gc
 
 
 def ts():
@@ -118,7 +119,12 @@ def read_bin(filename, dtype, start_idx=0, chunk_size=None):
             type_multiplier = 4
 
         arr = np.fromfile(f, count=nvecs * dim, dtype=dtype, offset=start_idx * dim * type_multiplier)
-    return arr.reshape(-1, dim)
+    # Reshaping an array may or may not involve a copy. The reasons will be explained in the How it works... section.
+    # For instance, reshaping a 2D matrix does not involve a copy, unless it is transposed
+    # (or more generally, non-contiguous):
+    # Source: https://ipython-books.github.io/45-understanding-the-internals-of-numpy-to-avoid-unnecessary-array-copying
+    # return arr.reshape(-1, dim)
+    return arr.T.reshape(-1, dim)
 
 
 def read_ibin(filename, start_idx=0, chunk_size=None):
@@ -192,6 +198,7 @@ def mmap_bin(filename, dtype):
             print(text)
 """
 
+
 # by UKPLab
 # From https://github.com/UKPLab/sentence-transformers/blob/master/sentence_transformers/util.py (MIT License)
 def pytorch_cos_sim(a: Tensor, b: Tensor):
@@ -250,6 +257,8 @@ def add_points(path, shard: Shard):
     index.addDataPointBatch(shard.points, shard.pointids)
     index.createIndex(print_progress=False)
     index.saveIndex(shardpath, save_data=True)
+    del index
+    gc.collect()
 
 
 # Loads index from disk

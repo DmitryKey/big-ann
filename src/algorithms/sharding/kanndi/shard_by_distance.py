@@ -181,7 +181,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                             need_seed_update = False
                         else:
                             # seed is up to date and we continue building the shard
-                            dist_j = distance_matrix(np.array([seed_point]), np.array([in_loop_points[j]]))
+                            # dist_j = distance_matrix(np.array([seed_point]), np.array([in_loop_points[j]]))
+                            dist_j = pdist(np.array([seed_point, in_loop_points[j]]))
                             if VERBOSE:
                                 print("got dist between seed_point and points[{}]: {}".format(j, dist_j))
                             if dist_j <= dist:
