@@ -241,11 +241,11 @@ def shard_filename(path,name):
 
 
 class Shard:
-    def __init__(self, shard_id: int, point_ids: list, points: List[list]):
+    def __init__(self, shard_id: int, point_ids: list, points: np.array):
         self.shardid = shard_id
         self.pointids = point_ids
         self.points = points
-        self.size = len(points)
+        self.size = len(point_ids)
 
 
 def add_points(path, shard: Shard):
