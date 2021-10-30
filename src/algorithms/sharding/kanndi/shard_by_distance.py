@@ -122,6 +122,10 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
     special_shard_points = []
     special_shard_point_ids = []
 
+    num_rows, num_cols = points.shape
+
+    points_pair = np.empty((2, num_cols))
+
     # number of batches, during which this shard is not growing -- terminate?
     # TODO
 
@@ -182,7 +186,12 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                         else:
                             # seed is up to date and we continue building the shard
                             # dist_j = distance_matrix(np.array([seed_point]), np.array([in_loop_points[j]]))
-                            dist_j = pdist(np.array([seed_point, in_loop_points[j]]))
+                            points_pair[0] = seed_point
+                            points_pair[1] = in_loop_points[j]
+                            if VERBOSE:
+                                print(f"points_pair[0]={points_pair[0]}")
+                                print(f"points_pair[1]={points_pair[1]}")
+                            dist_j = pdist(points_pair)
                             if VERBOSE:
                                 print("got dist between seed_point and points[{}]: {}".format(j, dist_j))
                             if dist_j <= dist:
