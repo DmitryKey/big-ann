@@ -214,8 +214,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
 
                     # check if we saturated the shard
                     if running_shard_point_id == expected_shard_size:
-                        #ids = shard_point_ids
-                        print(f"shard_points.shape={shard_points.shape}, shard_point_ids.shape={shard_point_ids.shape}, real size of shard_point_ids={running_shard_point_id}, shard_point_ids={shard_point_ids}")
+                        if VERBOSE:
+                            print(f"shard_points.shape={shard_points.shape}, shard_point_ids.shape={shard_point_ids.shape}, real size of shard_point_ids={running_shard_point_id}, shard_point_ids={shard_point_ids}")
 
                         shard = Shard(shard_id, shard_point_ids, shard_points, size=running_shard_point_id)
                         shard_id = add_shard(output_index_path, shard)
@@ -227,7 +227,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                         print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
                         break
 
-                accumulated_points_in_shard = len(shard_point_ids)
+                accumulated_points_in_shard = running_shard_point_id
                 # if the shard is in point collection phase
                 if accumulated_points_in_shard != 0:
                     print("Size of the current shard after going through the current batch: {}".format(accumulated_points_in_shard), flush=True)
@@ -248,12 +248,9 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
 
         # we reached the end of the whole dataset and can stash existing points into some "special shard"
         if running_shard_point_id < expected_shard_size:
-            print("!!! After going through the whole dataset, the shard did not saturate, at size: {} and % = {}".format(len(shard_point_ids), shard_saturation_percent), flush=True)
+            print("!!! After going through the whole dataset, the shard did not saturate, at size: {} and % = {}".format(running_shard_point_id, shard_saturation_percent), flush=True)
             if shard_saturation_percent > SHARD_SATURATION_PERCENT_MINIMUM:
-                if shard_points.shape[0] < shards_m:
-                    shard = Shard(shard_id, shard_point_ids, shard_points[0:shard_points.shape[0]], size=running_shard_point_id)
-                else:
-                    shard = Shard(shard_id, shard_point_ids, shard_points, size=running_shard_point_id)
+                shard = Shard(shard_id, shard_point_ids[0:running_shard_point_id], shard_points[0:running_shard_point_id], size=running_shard_point_id)
                 shard_id = add_shard(output_index_path, shard)
                 shards[shard.shardid] = shard.size
                 shard_id += 1
@@ -274,8 +271,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     print("!!! Appended to the special_shard, its running size: {}".format(len(special_shard_points)), flush=True)
                     special_shard_saturation_percent = (len(special_shard_point_ids) / expected_shard_size) * 100
                     if special_shard_saturation_percent > SHARD_SATURATION_PERCENT_MINIMUM:
-                        if special_shard_points.shape[0] < shards_m:
-                            shard = Shard(shard_id, special_shard_point_ids, special_shard_points[0:special_shard_points.shape[0]])
+                        if running_special_shard_point_id < expected_shard_size:
+                            shard = Shard(shard_id, special_shard_point_ids, special_shard_points[0:running_special_shard_point_id], size=running_special_shard_point_id)
                         else:
                             shard = Shard(shard_id, special_shard_point_ids, special_shard_points, size=running_special_shard_point_id)
 

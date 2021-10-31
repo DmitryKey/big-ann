@@ -12,6 +12,8 @@ import linecache
 import os
 import gc
 
+VERBOSE = False
+
 
 def ts():
     """
@@ -254,7 +256,8 @@ def add_points(path, shard: Shard):
     """
     shardpath = shard_filename(path, shard.shardid)
     index = nmslib.init(method='hnsw', space='l2')
-    print(f"add_points(): type(shard.pointids)={type(shard.pointids)}")
+    if VERBOSE:
+        print(f"add_points(): type(shard.pointids)={type(shard.pointids)}")
     index.addDataPointBatch(shard.points, ids=shard.pointids)
     index.createIndex(print_progress=False)
     index.saveIndex(shardpath, save_data=True)
