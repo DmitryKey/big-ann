@@ -78,7 +78,7 @@ def calculate_blended(
     dfMC = pd.read_csv(f'multicollinearity_{config_file}.csv')
     dfKS = pd.read_csv(f'komolgorovsmirnov_{config_file}.csv')
 
-    A = dfMC.to_numpy() + (1-dfKS.to_numpy())
+    A = dfMC.to_numpy() + (1.0-dfKS.to_numpy())
 
     #Build the network of buddies from the ks tests
     buddies = []
