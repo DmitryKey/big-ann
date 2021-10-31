@@ -77,7 +77,7 @@ def calculate_ksbuddies(
     
     df = pd.read_csv(f'komolgorovsmirnov_{config_file}.csv')
 
-    A = df.to_numpy()
+    A = 1 - df.to_numpy()
 
     #Build the network of buddies from the ks tests
     buddies = []
