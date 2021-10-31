@@ -241,11 +241,11 @@ def shard_filename(path,name):
 
 
 class Shard:
-    def __init__(self, shard_id: int, point_ids: list, points: np.array):
+    def __init__(self, shard_id: int, point_ids: np.array, points: np.array, size: int):
         self.shardid = shard_id
         self.pointids = point_ids
         self.points = points
-        self.size = len(point_ids)
+        self.size = size
 
 
 def add_points(path, shard: Shard):
@@ -254,7 +254,8 @@ def add_points(path, shard: Shard):
     """
     shardpath = shard_filename(path, shard.shardid)
     index = nmslib.init(method='hnsw', space='l2')
-    index.addDataPointBatch(shard.points, shard.pointids)
+    print(f"add_points(): type(shard.pointids)={type(shard.pointids)}")
+    index.addDataPointBatch(shard.points, ids=shard.pointids)
     index.createIndex(print_progress=False)
     index.saveIndex(shardpath, save_data=True)
     del index

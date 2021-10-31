@@ -1,4 +1,3 @@
-import sys
 from enum import Enum
 from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, display_top, read_fbin
 from numpy import linalg
@@ -8,7 +7,6 @@ from scipy.spatial import distance_matrix
 from scipy.spatial.distance import pdist
 import tracemalloc
 import argparse
-import gc
 
 
 # desired number of shardsCreates a new shard graph for a centroid shard
@@ -113,8 +111,10 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
     running_shard_point_id = 1
     shard_id = 0
 
-    # shard_ids contains the unique point ids as they come in from the input data structure
-    shard_point_ids = [shard_id]
+    # shard_ids contains the unique point ids as they come in from the input data structure:
+    # we pre-create the numpy array to reuse it multiple times
+    shard_point_ids = np.empty(expected_shard_size, dtype=np.int32)
+    shard_point_ids[0] = shard_id
     shard_saturation_percent = 0
 
     # all seed points, that are by design cluster centroids
@@ -189,7 +189,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                             running_shard_point_id = 1
                             all_seed_points.append(seed_point)
                             all_seed_points_ids.append(shard_id)
-                            shard_point_ids = [i]
+                            shard_point_ids[0] = i
                             need_seed_update = False
                         else:
                             # seed is up to date and we continue building the shard
@@ -207,20 +207,18 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                                     print("Got a neighbor!")
 
                                 shard_points[running_shard_point_id,] = in_loop_points[j]
-                                running_shard_point_id += 1
-                                shard_point_ids.append(candidate_point_id)
-
+                                shard_point_ids[running_shard_point_id] = candidate_point_id
                                 processed_point_ids.add(candidate_point_id)
 
+                                running_shard_point_id += 1
+
                     # check if we saturated the shard
-                    if len(shard_point_ids) == expected_shard_size:
-                        print(f"shard_points.shape={shard_points.shape}, size of shard_point_ids={len(shard_point_ids)}")
-                        shard = Shard(shard_id, shard_point_ids, shard_points)
+                    if running_shard_point_id == expected_shard_size:
+                        #ids = shard_point_ids
+                        print(f"shard_points.shape={shard_points.shape}, shard_point_ids.shape={shard_point_ids.shape}, real size of shard_point_ids={running_shard_point_id}, shard_point_ids={shard_point_ids}")
+
+                        shard = Shard(shard_id, shard_point_ids, shard_points, size=running_shard_point_id)
                         shard_id = add_shard(output_index_path, shard)
-                        # # reset the points arr
-                        # del shard_points
-                        # gc.collect()
-                        # shard_points = []
                         shards[shard.shardid] = shard.size
                         shard_id += 1
                         need_seed_update = True
@@ -238,13 +236,9 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     print("Saturation %: {}".format(shard_saturation_percent))
 
                 # check if we saturated the shard
-                if len(shard_point_ids) == expected_shard_size:
-                    shard = Shard(shard_id, shard_point_ids, shard_points)
+                if running_shard_point_id == expected_shard_size:
+                    shard = Shard(shard_id, shard_point_ids, shard_points, size=running_shard_point_id)
                     shard_id = add_shard(output_index_path, shard)
-                    ## reset the points arr
-                    # del shard_points
-                    # gc.collect()
-                    # shard_points = []
                     shards[shard.shardid] = shard.size
                     shard_id += 1
                     need_seed_update = True
@@ -253,18 +247,14 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
 
         # we reached the end of the whole dataset and can stash existing points into some "special shard"
-        if len(shard_point_ids) < expected_shard_size:
+        if running_shard_point_id < expected_shard_size:
             print("!!! After going through the whole dataset, the shard did not saturate, at size: {} and % = {}".format(len(shard_point_ids), shard_saturation_percent), flush=True)
             if shard_saturation_percent > SHARD_SATURATION_PERCENT_MINIMUM:
                 if shard_points.shape[0] < shards_m:
-                    shard = Shard(shard_id, shard_point_ids, shard_points[0:shard_points.shape[0]])
+                    shard = Shard(shard_id, shard_point_ids, shard_points[0:shard_points.shape[0]], size=running_shard_point_id)
                 else:
-                    shard = Shard(shard_id, shard_point_ids, shard_points)
+                    shard = Shard(shard_id, shard_point_ids, shard_points, size=running_shard_point_id)
                 shard_id = add_shard(output_index_path, shard)
-                ## reset the points arr
-                # del shard_points
-                # gc.collect()
-                # shard_points = []
                 shards[shard.shardid] = shard.size
                 shard_id += 1
                 need_seed_update = True
@@ -273,7 +263,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                 print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
             else:
                 # save the current starving shards' points only if we have them ;)
-                if len(shard_point_ids) > 0:
+                if running_shard_point_id > 0:
                     # TODO: apply same saturation threshold as for normal shards?
                     for idx, p in enumerate(shard_points):
                         special_shard_points[idx + running_special_shard_point_id,] = shard_points[idx]
@@ -287,15 +277,11 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                         if special_shard_points.shape[0] < shards_m:
                             shard = Shard(shard_id, special_shard_point_ids, special_shard_points[0:special_shard_points.shape[0]])
                         else:
-                            shard = Shard(shard_id, special_shard_point_ids, special_shard_points)
+                            shard = Shard(shard_id, special_shard_point_ids, special_shard_points, size=running_special_shard_point_id)
 
                         shard_id = add_shard(output_index_path, shard)
 
                         running_special_shard_point_id = 0
-
-                        ## reset the points arr
-                        #special_shard_points = []
-
                         shards[shard.shardid] = shard.size
                         shard_id += 1
 
@@ -308,7 +294,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
         display_top(tracemalloc, snapshot)
 
     # save the centroid graph
-    centroid_shard = Shard(-1, all_seed_points_ids, all_seed_points)
+    centroid_shard = Shard(-1, all_seed_points_ids, all_seed_points, size=len(all_seed_points_ids))
     add_shard(output_index_path, centroid_shard)
     print("Saved centroid shard with {} points".format(len(centroid_shard.pointids)))
 
