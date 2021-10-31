@@ -89,10 +89,10 @@ def calculate_komolgorovsmirnov(
     #All Komolgorov-Smirnov dimension pair tests
     ks = np.ndarray((total_num_dimensions,total_num_dimensions), dtype=float)
 
-    #Do it!
+    #For each dimension
     for dim in range(total_num_dimensions):
 
-        #Scalar values of a specific dimension for all points
+        #Scalar values of a specific dimension for all points in the sample
         dim_points = points[:,dim]
 
         #Compare with every other dimension:
