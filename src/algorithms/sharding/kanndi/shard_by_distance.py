@@ -1,3 +1,4 @@
+import gc
 from enum import Enum
 from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, display_top, read_fbin
 from numpy import linalg
@@ -233,7 +234,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     print("Size of the current shard after going through the current batch: {}".format(accumulated_points_in_shard), flush=True)
                     print("Expected shard size: {}".format(expected_shard_size), flush=True)
                     shard_saturation_percent = (accumulated_points_in_shard / expected_shard_size) * 100
-                    print("Saturation %: {}".format(shard_saturation_percent))
+                    print("Saturation {}%".format(shard_saturation_percent))
 
                 # check if we saturated the shard
                 if running_shard_point_id == expected_shard_size:
@@ -245,6 +246,11 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     is_last_shard_starving = False
                     shard_saturation_percent = 0
                     print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
+
+            # release the mem
+            if in_loop_points is not None:
+                del in_loop_points
+                gc.collect()
 
         # we reached the end of the whole dataset and can stash existing points into some "special shard"
         if running_shard_point_id < expected_shard_size:
