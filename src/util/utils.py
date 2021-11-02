@@ -1,5 +1,3 @@
-from typing import List
-
 import numpy as np
 from sklearn.preprocessing import normalize
 import struct
@@ -11,6 +9,8 @@ import nmslib
 import linecache
 import os
 import gc
+import itertools
+from intervaltree import Interval, IntervalTree
 
 VERBOSE = False
 
@@ -280,6 +280,7 @@ def query_shard(shard_name, query):
     results, distances = shard.knnQuery(query, k=10)
     return results, distances
 
+
 # RAM consumption monitoring
 # credit: https://stackoverflow.com/a/45679009/158328
 def display_top(tracemalloc, snapshot, key_type='lineno', limit=3):
@@ -306,3 +307,59 @@ def display_top(tracemalloc, snapshot, key_type='lineno', limit=3):
         print("%s other: %.1f KiB" % (len(other), size / 1024))
     total = sum(stat.size for stat in top_stats)
     print("Total allocated size: %.1f KiB" % (total / 1024))
+
+
+def intervals_extract(iterable: set):
+    """
+    The other pythonic method is to use Python itertools. We use itertools.groupby().
+    Where enumerate(iterable) is taken as iterable and lambda t: t[1] – t[0]) as key function
+    to find the sequence for intervals.
+
+    Source: https://www.geeksforgeeks.org/python-make-a-list-of-intervals-with-sequential-numbers/
+    """
+    iterable = sorted(iterable)
+    #print(f"intervals_extract() iterable={iterable}")
+    intervals = list()
+    for key, group in itertools.groupby(enumerate(iterable),
+                                        lambda t: t[1] - t[0]):
+        group = list(group)
+        intervals.append([group[0][1], group[-1][1]])
+
+    #print(f"intervals={intervals}")
+    return intervals
+
+
+def is_number_in_intervals(intervals: list, target: int):
+    """
+    Traverses intervals and checks if the given number is inside an interval.
+    Example:
+        interval: [[1, 6], [45, 48], [110, 112]]
+        number: 2
+        return: True
+    """
+    for interval in intervals:
+        # print(f"interval={interval} type(interval)={type(interval)} target={target} type(target)={type(target)}")
+        if interval[0] <= target <= interval[1]:
+            return True
+    return False
+
+
+def append_intervals_to_tree(intervals: list, tree: IntervalTree):
+    tree.update(
+        Interval(begin, end) for begin, end in intervals
+    )
+    tree.merge_neighbors()
+
+    return tree
+
+
+def is_number_in_interval_tree(t: IntervalTree, target: int):
+    if t is None:
+        return False
+
+    if len(t[target]) > 0:
+        return True
+    return False
+
+
+
