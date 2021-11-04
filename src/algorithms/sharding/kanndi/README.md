@@ -186,7 +186,7 @@ going inside inner loop by j over current batch of points, skipping the seed poi
 Saturated shard with id=77. Building HNSW index for it..
 ```
 
-If algorithm gets stuck on a starving shard, its points will get pushed to a special_shard and new seed points it chosen:
+ If the algorithm gets stuck on a starving shard, its points will get pushed to a special_shard and new seed point is chosen:
 
 ```
 Processing index=99000000

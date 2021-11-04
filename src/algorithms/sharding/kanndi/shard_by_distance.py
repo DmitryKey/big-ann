@@ -91,7 +91,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
     print(f"Reading data from {data_file} in {BATCH_SIZE} chunks", flush=True)
 
     range_upper = total_num_elements
-    print(f"range_upper={range_upper}")
+    print(f"range_upper={range_upper}", flush=True)
 
     # map from globally unique shard id to number of shard's elements
     shards = {}
@@ -244,7 +244,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     print("Size of the current shard after going through the current batch: {}".format(accumulated_points_in_shard), flush=True)
                     print("Expected shard size: {}".format(expected_shard_size), flush=True)
                     shard_saturation_percent = (accumulated_points_in_shard / expected_shard_size) * 100
-                    print("Saturation {}%".format(shard_saturation_percent))
+                    print("Saturation {}%".format(shard_saturation_percent), flush=True)
 
                 # check if we saturated the shard
                 if running_shard_point_id == expected_shard_size:
@@ -262,8 +262,10 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                 del in_loop_points
                 gc.collect()
 
-            # transform set into intervals
-            if processed_point_ids is not None:
+            # transform set into intervals for each 10M points
+            if processed_point_ids is not None and i % 10000000 == 0:
+                print(f"Reached another 10M step: working on intervals - update, compaction. "
+                      f"Input set of processed_point_ids: {len(processed_point_ids)}", flush=True)
                 intervals = intervals_extract(processed_point_ids)
                 processed_point_ids.clear()
                 for begin, end in intervals:
@@ -273,8 +275,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                         processed_point_ids.add(begin)
                 processed_point_id_interval_tree.merge_neighbors()
 
-                print(f"size of processed_point_id_interval_tree = {len(processed_point_id_interval_tree)}")
-                print(f"size of processed_point_ids = {len(processed_point_ids)}")
+                print(f"After compaction: size of processed_point_id_interval_tree = {len(processed_point_id_interval_tree)}", flush=True)
+                print(f"After compaction: size of processed_point_ids = {len(processed_point_ids)}", flush=True)
 
         # we reached the end of the whole dataset and can stash existing points into some "special shard"
         if running_shard_point_id < expected_shard_size:
@@ -323,7 +325,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
     # save the centroid graph
     centroid_shard = Shard(-1, all_seed_points_ids, all_seed_points, size=len(all_seed_points_ids))
     add_shard(output_index_path, centroid_shard)
-    print("Saved centroid shard with {} points".format(len(centroid_shard.pointids)))
+    print("Saved centroid shard with {} points".format(len(centroid_shard.pointids)), flush=True)
 
     print("Processed this many points: {}".format(len(processed_point_ids)), flush=True)
 
