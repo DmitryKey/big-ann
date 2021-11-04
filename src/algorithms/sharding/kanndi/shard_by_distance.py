@@ -1,9 +1,6 @@
 import gc
 from enum import Enum
-
-from intervaltree import IntervalTree, Interval
-from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, read_fbin, \
-    is_number_in_interval_tree, intervals_extract
+from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, read_fbin
 from numpy import linalg
 from statistics import median
 import numpy as np
@@ -82,16 +79,15 @@ def compute_median_dist(points)->float:
 def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.dtype, shards_m: int = M):
     #tracemalloc.start()
 
-    # set of integer order ids of each point that was already placed into a shard => processed
-    processed_point_ids = set()
-    processed_point_id_interval_tree = IntervalTree()
-
     total_num_elements = get_total_nvecs_fbin(data_file)
     print(f"Total number of points to process: {total_num_elements}", flush=True)
     print(f"Reading data from {data_file} in {BATCH_SIZE} chunks", flush=True)
 
     range_upper = total_num_elements
     print(f"range_upper={range_upper}", flush=True)
+
+    # set of integer order ids of each point that was already placed into a shard => processed
+    processed_point_ids = np.zeros(total_num_elements, dtype=bool)
 
     # map from globally unique shard id to number of shard's elements
     shards = {}
@@ -110,7 +106,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
     seed_point = points[seed_point_id]
     print("Seed point for shard {}: {}".format(seed_point_id, seed_point), flush=True)
     # remember the seed point id
-    processed_point_ids.add(seed_point_id)
+    processed_point_ids[seed_point_id] = True
 
     # shard contains the points themselves: we pre-create the numpy array to reuse it multiple times
     shard_points = np.empty((expected_shard_size, num_cols))
@@ -161,9 +157,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                 points_to_resample = []
                 for j in range(0, in_loop_points.shape[0]):
                     candidate_point_id = i + j
-                    if candidate_point_id not in processed_point_ids\
-                            and \
-                            not is_number_in_interval_tree(processed_point_id_interval_tree, candidate_point_id):
+                    if not processed_point_ids[candidate_point_id]:
                         points_to_resample.append(in_loop_points[j])
                         if len(points_to_resample) == SAMPLE_SIZE:
                             break
@@ -189,9 +183,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                         print("skipping the original seed point", flush=True)
                         continue
 
-                    if candidate_point_id not in processed_point_ids \
-                            and \
-                            not is_number_in_interval_tree(processed_point_id_interval_tree, candidate_point_id):
+                    if not processed_point_ids[candidate_point_id]:
                         # update seed point?
                         if need_seed_update:
                             seed_point = in_loop_points[j]
@@ -219,7 +211,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
 
                                 shard_points[running_shard_point_id,] = in_loop_points[j]
                                 shard_point_ids[running_shard_point_id] = candidate_point_id
-                                processed_point_ids.add(candidate_point_id)
+                                processed_point_ids[candidate_point_id] = True
 
                                 running_shard_point_id += 1
 
@@ -261,22 +253,6 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
             if in_loop_points is not None:
                 del in_loop_points
                 gc.collect()
-
-            # transform set into intervals for each 10M points
-            if processed_point_ids is not None and i % 10000000 == 0:
-                print(f"Reached another 10M step: working on intervals - update, compaction. "
-                      f"Input set of processed_point_ids: {len(processed_point_ids)}", flush=True)
-                intervals = intervals_extract(processed_point_ids)
-                processed_point_ids.clear()
-                for begin, end in intervals:
-                    if begin < end:
-                        processed_point_id_interval_tree.append(Interval(begin, end))
-                    elif begin == end:
-                        processed_point_ids.add(begin)
-                processed_point_id_interval_tree.merge_neighbors()
-
-                print(f"After compaction: size of processed_point_id_interval_tree = {len(processed_point_id_interval_tree)}", flush=True)
-                print(f"After compaction: size of processed_point_ids = {len(processed_point_ids)}", flush=True)
 
         # we reached the end of the whole dataset and can stash existing points into some "special shard"
         if running_shard_point_id < expected_shard_size:
