@@ -191,6 +191,15 @@ def write_bin(filename, dtype, vecs):
         f.write(struct.pack('<i', dim))
         vecs.astype(dtype).flatten().tofile(f)
 
+def buddy_up(points,friends):
+    #rearranges the points to put buddy dimensions next to each other.
+    #this will be used during PQ to get ideal subvectors without needing to modify Faiss
+    #friends is a 1D array of dimension indexes in order of their buddiness.
+    #for example if dims 12,17,18,50,52,96,101,113 are buddies, then they would appear as:
+    #[...,12,17,18,50,52,96,101,113,...] in the friends param.
+    #This is a beautiful one-liner in numpy...
+    return points[:,friends]
+
 """
 import mmap
 def mmap_bin(filename, dtype):
@@ -360,6 +369,3 @@ def is_number_in_interval_tree(t: IntervalTree, target: int):
     if len(t[target]) > 0:
         return True
     return False
-
-
-
