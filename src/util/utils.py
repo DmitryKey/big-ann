@@ -5,13 +5,21 @@ import torch
 from torch import Tensor
 import datetime
 import math
+import nmslib
+import linecache
+import os
+import gc
+import itertools
+from intervaltree import Interval, IntervalTree
+
+VERBOSE = False
 
 
 def ts():
     """
     Gets an ISO string timestamp, helps with seeing how long things took to run
     """
-    return str(datetime.datetime.now());
+    return str(datetime.datetime.now())
 
 
 def get_solr_vector_search(bert_client, query):
@@ -71,11 +79,13 @@ def get_total_nvecs_fbin(filename):
 
     return nvecs
 
+
 def get_total_dim_fbin(filename):
     with open(filename, "rb") as f:
         nvecs, dim = np.fromfile(f, count=2, dtype=np.int32)
 
     return dim
+
 
 def read_fbin(filename, start_idx=0, chunk_size=None):
     """ Read *.fbin file that contains float32 vectors
@@ -92,7 +102,10 @@ def read_fbin(filename, start_idx=0, chunk_size=None):
         nvecs = (nvecs - start_idx) if chunk_size is None else chunk_size
         arr = np.fromfile(f, count=nvecs * dim, dtype=np.float32,
                           offset=start_idx * 4 * dim)
-    return arr.reshape(nvecs, dim)
+        if arr.size > 0:
+            return arr.reshape(nvecs, dim)
+        else:
+            return np.zeros(shape=(1, dim))
 
 
 # by Leo Joffe
@@ -108,7 +121,12 @@ def read_bin(filename, dtype, start_idx=0, chunk_size=None):
             type_multiplier = 4
 
         arr = np.fromfile(f, count=nvecs * dim, dtype=dtype, offset=start_idx * dim * type_multiplier)
-    return arr.reshape(-1, dim)
+    # Reshaping an array may or may not involve a copy. The reasons will be explained in the How it works... section.
+    # For instance, reshaping a 2D matrix does not involve a copy, unless it is transposed
+    # (or more generally, non-contiguous):
+    # Source: https://ipython-books.github.io/45-understanding-the-internals-of-numpy-to-avoid-unnecessary-array-copying
+    # return arr.reshape(-1, dim)
+    return arr.T.reshape(-1, dim)
 
 
 def read_ibin(filename, start_idx=0, chunk_size=None):
@@ -191,6 +209,7 @@ def mmap_bin(filename, dtype):
             print(text)
 """
 
+
 # by UKPLab
 # From https://github.com/UKPLab/sentence-transformers/blob/master/sentence_transformers/util.py (MIT License)
 def pytorch_cos_sim(a: Tensor, b: Tensor):
@@ -215,9 +234,138 @@ def pytorch_cos_sim(a: Tensor, b: Tensor):
     return torch.mm(a_norm, b_norm.transpose(0, 1))
 
 
-#https://stackoverflow.com/questions/15450192/fastest-way-to-compute-entropy-in-python#45091961
 def entropy(labels, base=None):
-  value,counts = np.unique(labels, return_counts=True)
-  norm_counts = counts / counts.sum()
-  base = math.e if base is None else base
-  return -(norm_counts * np.log(norm_counts)/np.log(base)).sum()
+    """
+    https://stackoverflow.com/questions/15450192/fastest-way-to-compute-entropy-in-python#45091961
+    """
+    value,counts = np.unique(labels, return_counts=True)
+    norm_counts = counts / counts.sum()
+    base = math.e if base is None else base
+    return -(norm_counts * np.log(norm_counts)/np.log(base)).sum()
+
+
+def shard_filename(path,name):
+    """
+    Renders the filename for a shard
+    """
+    return f'{path}shard{name}.hnsw'
+
+
+class Shard:
+    def __init__(self, shard_id: int, point_ids: np.array, points: np.array, size: int):
+        self.shardid = shard_id
+        self.pointids = point_ids
+        self.points = points
+        self.size = size
+
+
+def add_points(path, shard: Shard):
+    """
+    Adds a batch of points to a specific shard
+    """
+    shardpath = shard_filename(path, shard.shardid)
+    index = nmslib.init(method='hnsw', space='l2')
+    if VERBOSE:
+        print(f"add_points(): type(shard.pointids)={type(shard.pointids)}")
+    index.addDataPointBatch(shard.points, ids=shard.pointids)
+    index.createIndex(print_progress=False)
+    index.saveIndex(shardpath, save_data=True)
+    del index
+    gc.collect()
+
+
+# Loads index from disk
+def load_index(filename):
+    index = nmslib.init(method='hnsw', space='l2')
+    index.createIndex(print_progress=True)
+    index.loadIndex(filename)
+    return index
+
+
+# Searches the given shard
+def query_shard(shard_name, query):
+    shard = nmslib.init(method='hnsw', space='l2')
+    shard.loadIndex(shard_name, load_data=True)
+    results, distances = shard.knnQuery(query, k=10)
+    return results, distances
+
+
+# RAM consumption monitoring
+# credit: https://stackoverflow.com/a/45679009/158328
+def display_top(tracemalloc, snapshot, key_type='lineno', limit=3):
+    snapshot = snapshot.filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, "<unknown>"),
+    ))
+    top_stats = snapshot.statistics(key_type)
+
+    print("Top %s lines" % limit)
+    for index, stat in enumerate(top_stats[:limit], 1):
+        frame = stat.traceback[0]
+        # replace "/path/to/module/file.py" with "module/file.py"
+        filename = os.sep.join(frame.filename.split(os.sep)[-2:])
+        print("#%s: %s:%s: %.1f KiB"
+              % (index, filename, frame.lineno, stat.size / 1024))
+        line = linecache.getline(frame.filename, frame.lineno).strip()
+        if line:
+            print('    %s' % line)
+
+    other = top_stats[limit:]
+    if other:
+        size = sum(stat.size for stat in other)
+        print("%s other: %.1f KiB" % (len(other), size / 1024))
+    total = sum(stat.size for stat in top_stats)
+    print("Total allocated size: %.1f KiB" % (total / 1024))
+
+
+def intervals_extract(iterable: set):
+    """
+    The other pythonic method is to use Python itertools. We use itertools.groupby().
+    Where enumerate(iterable) is taken as iterable and lambda t: t[1] – t[0]) as key function
+    to find the sequence for intervals.
+
+    Source: https://www.geeksforgeeks.org/python-make-a-list-of-intervals-with-sequential-numbers/
+    """
+    iterable = sorted(iterable)
+    #print(f"intervals_extract() iterable={iterable}")
+    intervals = list()
+    for key, group in itertools.groupby(enumerate(iterable),
+                                        lambda t: t[1] - t[0]):
+        group = list(group)
+        intervals.append([group[0][1], group[-1][1]])
+
+    #print(f"intervals={intervals}")
+    return intervals
+
+
+def is_number_in_intervals(intervals: list, target: int):
+    """
+    Traverses intervals and checks if the given number is inside an interval.
+    Example:
+        interval: [[1, 6], [45, 48], [110, 112]]
+        number: 2
+        return: True
+    """
+    for interval in intervals:
+        # print(f"interval={interval} type(interval)={type(interval)} target={target} type(target)={type(target)}")
+        if interval[0] <= target <= interval[1]:
+            return True
+    return False
+
+
+def append_intervals_to_tree(intervals: list, tree: IntervalTree):
+    tree.update(
+        Interval(begin, end) for begin, end in intervals
+    )
+    tree.merge_neighbors()
+
+    return tree
+
+
+def is_number_in_interval_tree(t: IntervalTree, target: int):
+    if t is None:
+        return False
+
+    if len(t[target]) > 0:
+        return True
+    return False

@@ -1,40 +1,44 @@
-from util.utils import read_fbin, read_bin, get_total_nvecs_fbin, pytorch_cos_sim, ts
-from numpy import linalg
+from util.utils import read_bin, get_total_nvecs_fbin, pytorch_cos_sim, ts
 from statistics import median
 import numpy as np
 
-from torch import stack as torch_stack
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
 import sys
 import importlib
 import pickle
 
-if len(sys.argv)>1:
+if len(sys.argv) > 1:
     config_file = sys.argv[1]
 else:
     config_file = 'config_small'
 config = importlib.import_module(config_file)
 
-#Where's the data
+# Where's the data
 INDEX_PATH = config.INDEX_PATH
 DATA_TYPE = config.DATA_TYPE
 DATA_FILE = config.DATA_FILE
 QUERY_FILE = config.QUERY_FILE
 
-#See config.small.py for the config options descriptions
+# See config.small.py for the config options descriptions
 RANDOM_SEED = config.RANDOM_SEED
 SAMPLE_SIZE = config.SAMPLE_SIZE
 BATCH_SIZE = config.BATCH_SIZE
 MAX_ITER = config.MAX_ITER
 S = config.S
 
-#Renders the filename for the kmeans pickle
+
 def centroids_filename(path):
+    """
+    Renders the filename for the kmeans pickle
+    """
     return f'{path}centroids_{config_file}.pickle'
 
-#Show the extremes of the similarity scores between all the centroids
+
 def show_distance_stats(allpoints):
+    """
+    Show the extremes of the similarity scores between all the centroids
+    """
     #points = np.random.choice(allpoints,size=100)
     points = allpoints[np.random.choice(allpoints.shape[0], size=min(len(allpoints),500), replace=False)]
     similarities = pytorch_cos_sim(points,points)
@@ -45,10 +49,11 @@ def show_distance_stats(allpoints):
     scores = sorted(scores)
     print(f'  Farthest:{scores[0]}    Median:{median(scores)}     Closest:{scores[len(scores)-1]}')
 
-"""
-This will take a sample of the dataset to fit centroids that will be used as shard entry points
-"""
+
 def find_centroids(data_file, dtype, sample_size: int = SAMPLE_SIZE, n_clusters: int = S, max_iter: int = MAX_ITER):
+    """
+    This will take a sample of the dataset to fit centroids that will be used as shard entry points
+    """
     print(f'Loading Samples: {ts()}')
     points = read_bin(data_file, dtype, start_idx=0, chunk_size=sample_size)
     print(f'Clustering dataset shape: {points.shape}')
@@ -60,9 +65,7 @@ def find_centroids(data_file, dtype, sample_size: int = SAMPLE_SIZE, n_clusters:
     
     return kmeans.cluster_centers_
 
-"""
-This will minibatch on a sample of the dataset to fit centroids that will be used as shard entry points
-"""
+
 def find_centroids_batch(
         path, 
         data_file, 
@@ -72,8 +75,11 @@ def find_centroids_batch(
         n_clusters: int = S, 
         max_iter: int = MAX_ITER
     ):
+    """
+    This will minibatch on a sample of the dataset to fit centroids that will be used as shard entry points
+    """
 
-    #Prepare for batch indexing
+    # Prepare for batch indexing
     total_num_elements = get_total_nvecs_fbin(data_file)
     if sample_size and sample_size<total_num_elements:
         range_upper = sample_size
@@ -89,7 +95,7 @@ def find_centroids_batch(
     else:
         kmeans = MiniBatchKMeans(n_clusters=n_clusters, max_iter=max_iter, batch_size=batch_size,verbose=1)
     
-    #Load and index the datafile in batches
+    # Load and index the datafile in batches
     for batch in range(0, range_upper, batch_size):
 
         points = read_bin(data_file, dtype, start_idx=batch, chunk_size=batch_size)
@@ -103,6 +109,7 @@ def find_centroids_batch(
         print(kmeans_test.cluster_centers_)
 
     return kmeans
+
 
 if __name__ == "__main__":
     #find_centroids_batch("../data/shards/","../data/bigann/learn.100M.u8bin",np.uint8)

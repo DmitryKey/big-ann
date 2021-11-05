@@ -19,7 +19,7 @@ MAXIMUM_QUERIES = 10000
 
 #Gets an ISO string timestamp, helps with seeing how long things took to run
 def ts():
-    return str(datetime.datetime.now());
+    return str(datetime.datetime.now())
 
 #Renders the filename for a shard
 def shard_filename(path,name):
