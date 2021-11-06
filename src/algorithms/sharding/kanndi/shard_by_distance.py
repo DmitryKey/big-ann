@@ -227,8 +227,10 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                         need_seed_update = True
                         is_last_shard_starving = False
                         shard_saturation_percent = 0
-                        print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
-                        break
+                        print(f"Shards built so far: {shards} with {len(shards.keys())} keys", flush=True)
+                        print(f"Collected {len(all_seed_points)} centroids")
+                        assert len(shards.keys()) == len(all_seed_points), "Number of shards and collected centroids do not match"
+                        continue
 
                 accumulated_points_in_shard = running_shard_point_id
                 # if the shard is in point collection phase
@@ -247,12 +249,19 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                     need_seed_update = True
                     is_last_shard_starving = False
                     shard_saturation_percent = 0
-                    print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
+                    print(f"Shards built so far: {shards} with {len(shards.keys())} keys", flush=True)
+                    print(f"Collected {len(all_seed_points)} centroids")
+                    assert len(shards.keys()) == len(
+                        all_seed_points), "Number of shards and collected centroids do not match"
 
             # release the mem
             if in_loop_points is not None:
                 del in_loop_points
                 gc.collect()
+
+        if len(shards.keys()) == shards_m:
+            print(f"Have reached {shards_m} shards. Breaking from the while loop")
+            break
 
         # we reached the end of the whole dataset and can stash existing points into some "special shard"
         if running_shard_point_id < expected_shard_size:
@@ -265,7 +274,10 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
                 need_seed_update = True
                 is_last_shard_starving = False
                 shard_saturation_percent = 0
-                print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
+                print(f"Shards built so far: {shards} with {len(shards.keys())} keys", flush=True)
+                print(f"Collected {len(all_seed_points)} centroids")
+                assert len(shards.keys()) == len(
+                    all_seed_points), "Number of shards and collected centroids do not match"
             else:
                 # save the current starving shards' points only if we have them ;)
                 if running_shard_point_id > 0:
@@ -297,6 +309,9 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype:np.
 
         #snapshot = tracemalloc.take_snapshot()
         #display_top(tracemalloc, snapshot)
+
+    assert len(shards.keys()) == len(
+        all_seed_points), "Number of shards and collected centroids do not match"
 
     # save the centroid graph
     centroid_shard = Shard(-1, all_seed_points_ids, all_seed_points, size=len(all_seed_points_ids))
