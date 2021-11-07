@@ -252,11 +252,18 @@ def shard_filename(path,name):
 
 
 class Shard:
-    def __init__(self, shard_id: int, point_ids: np.array, points: np.array, size: int):
+    def __init__(self, shard_id: int, point_ids: np.array, points: np.array, size: int, shard_saturation_percent: float):
         self.shardid = shard_id
         self.pointids = point_ids
         self.points = points
         self.size = size
+        self.shard_saturation_percent = shard_saturation_percent
+
+
+class SpacePoint:
+    def __init__(self, id: int, point: np.array):
+        self.point_id = id
+        self.point = point
 
 
 def add_points(path, shard: Shard):
