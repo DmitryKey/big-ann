@@ -368,24 +368,6 @@ def process_batch(centroids: List[SpacePoint], dist, expected_shard_size: int, o
         shard.shard_saturation_percent = (accumulated_points_in_shard / expected_shard_size) * 100
         print(f"Saturation {shard.shard_saturation_percent}%", flush=True)
 
-    # TODO: Obsolete block of code, because we handle shard saturation inside for loop
-    ## check if we saturated the shard outside the for loop
-    #if running_shard_point_id == expected_shard_size:
-    #    print("This condition is unreachable: check if we saturated the shard outside the for loop: "
-    #          "if running_shard_point_id == expected_shard_size:")
-    #
-    #    shard_id = add_shard(output_index_path, shard)
-    #    shards[shard.shardid] = shard.size
-    #    shard_id += 1
-    #    need_seed_update = True
-    #    is_last_shard_starving = False
-    #    shard.shard_saturation_percent = 0
-    #
-    #    print(f"Shards built so far: {shards} with {len(shards.keys())} keys", flush=True)
-    #    print(f"Collected {len(centroids)} centroids")
-    #
-    #    assert len(shards.keys()) == len(centroids), "Number of shards and collected centroids do not match"
-
     return is_last_shard_starving, need_seed_update, shard, running_shard_point_id, shard_id
 
 
