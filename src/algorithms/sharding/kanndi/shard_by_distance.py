@@ -116,11 +116,12 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
     running_shard_point_id = 1
     shard_id = 0
 
+    global_shard_id = 0
+
     # shard_ids contains the unique point ids as they come in from the input data structure:
     # we pre-create the numpy array to reuse it multiple times
     shard_point_ids = np.empty(expected_shard_size, dtype=np.int32)
     shard_point_ids[0] = shard_id
-    shard_saturation_percent = 0
 
     # all seed points, that are by design cluster centroids;
     # these seed points will be stored as a separate HNSW graph
@@ -183,11 +184,11 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
                 print("going inside inner loop by j over current batch of points", flush=True)
 
                 is_last_shard_starving, need_seed_update,\
-                    shard, running_shard_point_id, shard_id =\
+                    shard, running_shard_point_id, global_shard_id =\
                     process_batch(centroids, dist, expected_shard_size, i, in_loop_points,
                                   is_last_shard_starving, need_seed_update,
                                   output_index_path, points_pair, processed_point_ids,
-                                  running_shard_point_id, shard,
+                                  running_shard_point_id, shard, global_shard_id,
                                   shards)
 
             # release the mem
@@ -207,14 +208,13 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
 
             if shard.shard_saturation_percent > SHARD_SATURATION_PERCENT_MINIMUM:
                 # we take portion of this incomplete shard and save to disk
-                shard = Shard(shard_id,
+                shard = Shard(shard_point_ids[0],
                               shard_point_ids[0:running_shard_point_id],
                               shard_points[0:running_shard_point_id],
                               size=running_shard_point_id,
                               shard_saturation_percent=shard.shard_saturation_percent)
-                shard_id = add_shard(output_index_path, shard)
+                add_shard(output_index_path, shard)
                 shards[shard.shardid] = shard.size
-                shard_id += 1
                 need_seed_update = True
                 is_last_shard_starving = False
                 shard.shard_saturation_percent = 0
@@ -237,23 +237,22 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
 
                     if special_shard_saturation_percent > SHARD_SATURATION_PERCENT_MINIMUM:
                         if running_special_shard_point_id < expected_shard_size:
-                            shard = Shard(shard_id,
+                            shard = Shard(special_shard_point_ids[0],
                                           special_shard_point_ids,
                                           special_shard_points[0:running_special_shard_point_id],
                                           size=running_special_shard_point_id,
                                           shard_saturation_percent=special_shard_saturation_percent)
                         else:
-                            shard = Shard(shard_id,
+                            shard = Shard(special_shard_point_ids[0],
                                           special_shard_point_ids,
                                           special_shard_points,
                                           size=running_special_shard_point_id,
                                           shard_saturation_percent=special_shard_saturation_percent)
 
-                        shard_id = add_shard(output_index_path, shard)
+                        add_shard(output_index_path, shard)
 
                         running_special_shard_point_id = 0
                         shards[shard.shardid] = shard.size
-                        shard_id += 1
 
                         print("Shards built so far: {} with {} keys".format(shards, len(shards.keys())), flush=True)
                         print(f"Collected {len(centroids)} centroids")
@@ -280,7 +279,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
 def process_batch(centroids: List[SpacePoint], dist, expected_shard_size: int, offset: int, in_loop_points: np.array,
                   is_last_shard_starving: bool, need_seed_update: bool, output_index_path: str,
                   points_pair: np.array, processed_point_ids: np.array,
-                  running_shard_point_id: int, shard: Shard,
+                  running_shard_point_id: int, shard: Shard, global_shard_id: int,
                   shards: dict):
     """
     This method processes a given batch of points and creates shards. Most likely it might create at most 1 shard,
@@ -290,10 +289,6 @@ def process_batch(centroids: List[SpacePoint], dist, expected_shard_size: int, o
     If shard has saturated, the method saves it to disk and continues processing the remaining points in the batch.
     If shard did not saturate, the method will return it as is.
     """
-
-    # current shard id
-    # Note: it may change as a result of saturating current shard
-    shard_id = shard.shardid
 
     for j in range(0, in_loop_points.shape[0]):
         # id of the shard candidate is a combination of the running i-th batch and offset j within it
@@ -310,7 +305,8 @@ def process_batch(centroids: List[SpacePoint], dist, expected_shard_size: int, o
 
                 shard.points[0] = seed_point
                 shard.pointids[0] = offset
-                shard.shardid = offset
+                global_shard_id += 1
+                shard.shardid = global_shard_id
                 running_shard_point_id = 1
                 shard.size = running_shard_point_id
 
@@ -348,9 +344,8 @@ def process_batch(centroids: List[SpacePoint], dist, expected_shard_size: int, o
                     f"shard_points.shape={shard.points.shape}, shard_point_ids.shape={shard.pointids.shape}, "
                     f"real size of shard_point_ids={running_shard_point_id}, shard_point_ids={shard.pointids}")
 
-            shard_id = add_shard(output_index_path, shard)
+            add_shard(output_index_path, shard)
             shards[shard.shardid] = shard.size
-            shard_id += 1
             need_seed_update = True
             is_last_shard_starving = False
             shard.shard_saturation_percent = 0
@@ -368,7 +363,7 @@ def process_batch(centroids: List[SpacePoint], dist, expected_shard_size: int, o
         shard.shard_saturation_percent = (accumulated_points_in_shard / expected_shard_size) * 100
         print(f"Saturation {shard.shard_saturation_percent}%", flush=True)
 
-    return is_last_shard_starving, need_seed_update, shard, running_shard_point_id, shard_id
+    return is_last_shard_starving, need_seed_update, shard, running_shard_point_id, global_shard_id
 
 
 def add_shard(output_index_path, shard):
@@ -378,7 +373,6 @@ def add_shard(output_index_path, shard):
     print("Saturated shard with id={}. Building HNSW index for it..".format(shard.shardid), flush=True)
     add_points(output_index_path, shard)
     print("Done", flush=True)
-    return shard.shardid
 
 
 if __name__ == '__main__':
