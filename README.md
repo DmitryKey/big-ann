@@ -1,8 +1,10 @@
 # big-ann
 
-Let's use this repo for experimenting with Big ANN algorithm ideas.
-
 Billion-Scale Approximate Nearest Neighbor Search Challenge: http://big-ann-benchmarks.com/index.html
+
+The following blog describes BuddyPQ algorithm in detail, which achived 12% increase in recall over FAISS for 10M dataset:
+
+[Billion-Scale Vector Search: Team Sisu and BuddyPQ](https://dmitry-kan.medium.com/billion-scale-vector-search-team-sisu-and-buddypq-ce9b016fd433)
 
 Solutions implemented so far
 ==
