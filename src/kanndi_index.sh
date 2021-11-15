@@ -14,7 +14,7 @@ export PYTHONPATH=.
 python -m memory_profiler algorithms/sharding/kanndi/shard_by_distance.py --input_file /datadrive/big-ann-benchmarks/data/bigann/base.1B.u8bin.crop_nb_10000000 --output_dir /datadrive/big-ann/index/bigann/data.10M/ -M 10 --dtype uint8
 
 # 1B points
-# python algorithms/sharding/kanndi/shard_by_distance.py --input_file /datadrive/big-ann-benchmarks/data/bigann/base.1B.u8bin --output_dir /datadrive/big-ann/index/bigann/data.1B/ -M 1000 --dtype uint8
+# python algorithms/sharding/kanndi/shard_by_distance.py --input_file /datadrive/big-ann-benchmarks/data/bigann/base.1Billion.u8bin --output_dir /datadrive/big-ann/index/bigann/data.1B/ -M 1000 --dtype uint8
 
 
 ###
