@@ -324,7 +324,6 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
                     special_shard_saturation_percent = (len(special_shard_point_ids) / expected_shard_size) * 100
 
                     if special_shard_saturation_percent > SHARD_SATURATION_PERCENT_MINIMUM:
-                        global_shard_id += 1
                         if running_special_shard_point_id < expected_shard_size:
                             shard = Shard(global_shard_id,
                                           special_shard_point_ids,
@@ -338,9 +337,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
                                           size=running_special_shard_point_id,
                                           shard_saturation_percent=special_shard_saturation_percent)
 
-                        centroid = SpacePoint(shard.shardid, special_shard_points[0])
-                        centroids.append(centroid)
-
+                        # output shard
+                        # centroid was added earlier, when we chose new seed point
                         add_shard(output_index_path, shard)
 
                         running_special_shard_point_id = 0
