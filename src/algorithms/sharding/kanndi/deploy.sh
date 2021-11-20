@@ -1,4 +1,4 @@
-IP=23.102.16.204
+IP=168.63.67.127
 KEY=/Users/dmitry/Desktop/BigANN/Azure/dmitrykan_key.cer
 SOURCE_ROOT=src
 TAR_FILE=engine.tar.gz

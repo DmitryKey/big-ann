@@ -6,6 +6,7 @@ from torch import Tensor
 import datetime
 import math
 import nmslib
+import hnswlib
 import linecache
 import os
 import gc
@@ -252,12 +253,13 @@ def shard_filename(path,name):
 
 
 class Shard:
-    def __init__(self, shard_id: int, point_ids: np.array, points: np.array, size: int, shard_saturation_percent: float):
+    def __init__(self, shard_id: int, point_ids: np.array, points: np.array, size: int, shard_saturation_percent: float, dim: int):
         self.shardid = shard_id
         self.pointids = point_ids
         self.points = points
         self.size = size
         self.shard_saturation_percent = shard_saturation_percent
+        self.dim = dim
 
 
 class SpacePoint:
@@ -279,6 +281,19 @@ def add_points(path, shard: Shard):
     index.saveIndex(shardpath, save_data=True)
     del index
     gc.collect()
+
+
+def save_shard(path, shard: Shard):
+    """
+    Adds a batch of points to a specific shard
+    """
+    shardpath = shard_filename(path, shard.shardid)
+    p = hnswlib.Index(space='l2', dim=shard.dim)
+    p.init_index(max_elements=shard.size, ef_construction=200, M=16)
+    p.add_items(shard.points, ids=shard.pointids)
+    p.set_ef(50)
+    p.save_index(shardpath)
+    del p
 
 
 # Loads index from disk

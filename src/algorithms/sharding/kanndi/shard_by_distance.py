@@ -3,7 +3,7 @@ from enum import Enum
 
 from typing import List
 
-from util.utils import read_bin, get_total_nvecs_fbin, add_points, Shard, read_fbin, SpacePoint
+from util.utils import read_bin, get_total_nvecs_fbin, Shard, read_fbin, SpacePoint, save_shard
 from numpy import linalg
 from statistics import median
 import numpy as np
@@ -248,7 +248,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
                                 f"real size of shard_point_ids={running_shard_point_id}, shard_point_ids={shard_point_ids}")
 
                         shard = Shard(global_shard_id, shard_point_ids, shard_points, size=running_shard_point_id,
-                                      shard_saturation_percent=0)
+                                      shard_saturation_percent=0, dim=num_cols)
 
                         add_shard(output_index_path, shard)
                         shards[shard.shardid] = shard.size
@@ -276,7 +276,7 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
             # release the mem
             if in_loop_points is not None:
                 del in_loop_points
-                gc.collect()
+                # gc.collect()
 
         if len(shards.keys()) == shards_m:
             print(f"Have reached {shards_m} shards. Breaking from the while loop")
@@ -296,7 +296,8 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
                               shard_point_ids[0:running_shard_point_id],
                               shard_points[0:running_shard_point_id],
                               size=running_shard_point_id,
-                              shard_saturation_percent=shard_saturation_percent)
+                              shard_saturation_percent=shard_saturation_percent,
+                              dim=num_cols)
 
                 centroid = SpacePoint(shard.shardid, shard_points[0])
                 centroids.append(centroid)
@@ -321,7 +322,10 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
                     special_shard_point_ids.extend(shard_point_ids)
                     print("!!! Appended to the special_shard, its running size: {}".format(running_special_shard_point_id), flush=True)
 
-                    special_shard_saturation_percent = (len(special_shard_point_ids) / expected_shard_size) * 100
+                    # remove last inserted element from centoroids, because this shard has been starving
+                    centroids.pop()
+
+                    special_shard_saturation_percent = (running_special_shard_point_id / expected_shard_size) * 100
 
                     if special_shard_saturation_percent > SHARD_SATURATION_PERCENT_MINIMUM:
                         if running_special_shard_point_id < expected_shard_size:
@@ -329,13 +333,15 @@ def shard_by_dist(data_file: str, dist: float, output_index_path: str, dtype: np
                                           special_shard_point_ids,
                                           special_shard_points[0:running_special_shard_point_id],
                                           size=running_special_shard_point_id,
-                                          shard_saturation_percent=special_shard_saturation_percent)
+                                          shard_saturation_percent=special_shard_saturation_percent,
+                                          dim=num_cols)
                         else:
                             shard = Shard(global_shard_id,
                                           special_shard_point_ids,
                                           special_shard_points,
                                           size=running_special_shard_point_id,
-                                          shard_saturation_percent=special_shard_saturation_percent)
+                                          shard_saturation_percent=special_shard_saturation_percent,
+                                          dim=num_cols)
 
                         # output shard
                         # centroid was added earlier, when we chose new seed point
@@ -463,7 +469,8 @@ def add_shard(output_index_path, shard):
     Saves shard to disk and returns shard id of the future shard
     """
     print("Saturated shard with id={}. Building HNSW index for it..".format(shard.shardid), flush=True)
-    add_points(output_index_path, shard)
+    # add_points(output_index_path, shard)
+    save_shard(output_index_path, shard)
     print("Done", flush=True)
 
 
