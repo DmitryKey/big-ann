@@ -1,4 +1,5 @@
 import numpy as np
+from memory_profiler import profile
 from sklearn.preprocessing import normalize
 import struct
 import torch
@@ -110,6 +111,7 @@ def read_fbin(filename, start_idx=0, chunk_size=None):
 
 
 # by Leo Joffe
+#@profile
 def read_bin(filename, dtype, start_idx=0, chunk_size=None):
     with open(filename, "rb") as f:
         # The header is two np.int32 values
@@ -192,6 +194,7 @@ def write_bin(filename, dtype, vecs):
         f.write(struct.pack('<i', dim))
         vecs.astype(dtype).flatten().tofile(f)
 
+
 def buddy_up(points,friends):
     #rearranges the points to put buddy dimensions next to each other.
     #this will be used during PQ to get ideal subvectors without needing to modify Faiss
@@ -253,6 +256,7 @@ def shard_filename(path,name):
 
 
 class Shard:
+    @profile
     def __init__(self, shard_id: int, point_ids: np.array, points: np.array, size: int, shard_saturation_percent: float, dim: int):
         self.shardid = shard_id
         self.pointids = point_ids
@@ -282,7 +286,7 @@ def add_points(path, shard: Shard):
     del index
     gc.collect()
 
-
+@profile
 def save_shard(path, shard: Shard):
     """
     Adds a batch of points to a specific shard
